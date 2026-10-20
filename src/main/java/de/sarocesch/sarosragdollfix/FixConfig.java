@@ -28,6 +28,7 @@ public final class FixConfig {
    public static final ForgeConfigSpec.BooleanValue OWN_RENDER_DUMMY;
    public static final ForgeConfigSpec.BooleanValue REMOVE_ORIGINAL_FOR_RIGID;
    public static final ForgeConfigSpec.BooleanValue CONVERT_GEO;
+   public static final ForgeConfigSpec.BooleanValue CONVERT_CITADEL;
    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> GEO_HIDDEN_BONES;
 
    static {
@@ -69,6 +70,10 @@ public final class FixConfig {
             "with flopping limbs like vanilla mobs. If a model cannot be converted it falls back to the rigid box.",
             "false = always use the rigid box.")
          .define("convertGeoModels", true);
+      CONVERT_CITADEL = b.comment(
+            "Citadel mobs (Alex's Mobs ...): copy the mob's boxes into a limb-by-limb skeleton so they ragdoll with flopping",
+            "limbs. If a model cannot be converted it falls back to the rigid box. false = always use the rigid box.")
+         .define("convertCitadelModels", true);
       GEO_HIDDEN_BONES = b.comment(
             "Bone names (lower case) that GeckoLib mobs show only in certain states (sleeping, angry ...). They are left out of",
             "the converted skeleton, otherwise they would be drawn on top of the normal parts. Bones named baby_* are only",

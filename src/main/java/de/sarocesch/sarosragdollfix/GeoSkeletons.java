@@ -71,17 +71,26 @@ public final class GeoSkeletons {
             return null;
          }
 
-         ResourceLocation geo = resolveGeo(renderer, dummy, type);
-         if (geo == null) {
-            return null;
-         }
-
          Set<String> hidden = new HashSet<>();
          for (String s : FixConfig.GEO_HIDDEN_BONES.get()) {
             hidden.add(s.trim().toLowerCase(Locale.ROOT));
          }
 
-         GeoSyntheticModel model = GeoModelConverter.convert(geo, baby, hidden);
+         GeoSyntheticModel model = null;
+         String source = "";
+         if (FixConfig.CONVERT_GEO.get()) {
+            ResourceLocation geo = resolveGeo(renderer, dummy, type);
+            if (geo != null) {
+               model = GeoModelConverter.convert(geo, baby, hidden);
+               source = geo.toString();
+            }
+         }
+
+         if (model == null && FixConfig.CONVERT_CITADEL.get()) {
+            model = CitadelModelConverter.convert(renderer, dummy);
+            source = "citadel model";
+         }
+
          if (model == null) {
             return null;
          }
@@ -99,7 +108,7 @@ public final class GeoSkeletons {
          }
 
          CONVERTED.add(skeleton);
-         SarosRagdollFix.LOG.info("[ragdoll-fix] {} -> {} bones from {}", type, skeleton.bones.size(), geo);
+         SarosRagdollFix.LOG.info("[ragdoll-fix] {} -> {} bones from {}", type, skeleton.bones.size(), source);
          return skeleton;
       } catch (Throwable t) {
          SarosRagdollFix.LOG.warn("[ragdoll-fix] geo conversion failed for {}", type, t);

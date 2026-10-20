@@ -70,7 +70,7 @@ public abstract class ClientRagdollManagerMixin {
       )
    )
    private MobSkeleton saros_fix$skipGuessedSkeleton(VanillaModelSkeletonProvider provider, EntityType<?> type, ClientLevel level, boolean baby) {
-      if (FixConfig.CONVERT_GEO.get()) {
+      if (FixConfig.CONVERT_GEO.get() || FixConfig.CONVERT_CITADEL.get()) {
          // GeckoLib mobs: convert the .geo.json so they get limbs. Null = not convertible, use the old behaviour.
          MobSkeleton converted = GeoSkeletons.tryBuild(provider, type, level, baby);
          if (converted != null) {
