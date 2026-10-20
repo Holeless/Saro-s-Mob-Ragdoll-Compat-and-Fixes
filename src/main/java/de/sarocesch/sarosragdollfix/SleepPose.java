@@ -1,7 +1,6 @@
 package de.sarocesch.sarosragdollfix;
 
 import com.jme3.bullet.objects.PhysicsRigidBody;
-import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import de.sarocesch.sarosmobragdoll.ragdoll.physics.BoneRagdollPhysics;
@@ -30,8 +29,8 @@ public final class SleepPose {
       // that way first (towards the head for face down).
       Vector3f front = faceDown ? head : head.negate();
       float turn = (float)Math.atan2(front.x, front.z) + (float)Math.toRadians(bodyYaw);
-      Quaternion q = new Quaternion().fromAngleAxis(FastMath.HALF_PI, new Vector3f(head.z, 0.0F, -head.x))
-         .mult(new Quaternion().fromAngleAxis(turn, Vector3f.UNIT_Y));
+      Quaternion q = new Quaternion().fromAngleNormalAxis((float)(Math.PI / 2.0), new Vector3f(head.z, 0.0F, -head.x))
+         .mult(new Quaternion().fromAngleNormalAxis(turn, Vector3f.UNIT_Y));
 
       Vector3f p = new Vector3f();
       Vector3f moved = new Vector3f();
