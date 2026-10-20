@@ -12,13 +12,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import javax.annotation.Nullable;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.npc.VillagerData;
+import net.minecraft.world.entity.npc.VillagerDataHolder;
+import net.minecraft.world.entity.npc.VillagerProfession;
 
 // Per-ragdoll render data. Weak keys, so entries go away with their ragdoll.
 public final class RigidDummies {
@@ -103,9 +109,69 @@ public final class RigidDummies {
          if (FixConfig.COPY_DAMAGE_STATE.get()) {
             captureExtras(ragdoll, skeleton, dummy);
          }
+
+         addVillagerClothes(ragdoll, dummy);
       } catch (Throwable t) {
          SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve look for {}", type, t);
       }
+   }
+
+   // Villager clothes (profession texture and level badge) read straight from the villager's data, same textures and
+   // order as vanilla's VillagerProfessionLayer. Doesn't depend on what Saro's layer probe found.
+   private static void addVillagerClothes(ClientMobRagdoll ragdoll, Entity dummy) {
+      if (!(dummy instanceof VillagerDataHolder holder) || !(dummy instanceof LivingEntity living) || living.isBaby()) {
+         return;
+      }
+
+      VillagerData data = holder.getVillagerData();
+      VillagerProfession profession = data.getProfession();
+      if (profession == VillagerProfession.NONE) {
+         return;
+      }
+
+      List<RenderType> old = EXTRA_TYPES.get(ragdoll);
+      List<RenderType> extras = old == null ? new ArrayList<>() : new ArrayList<>(old);
+      ResourceLocation id = BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
+      addTexture(extras, new ResourceLocation(id.getNamespace(), "textures/entity/villager/profession/" + id.getPath() + ".png"));
+      if (profession != VillagerProfession.NITWIT) {
+         String[] badges = {"stone", "iron", "gold", "emerald", "diamond"};
+         int level = Math.max(1, Math.min(5, data.getLevel()));
+         addTexture(extras, new ResourceLocation("textures/entity/villager/profession_level/" + badges[level - 1] + ".png"));
+      }
+
+      if (!extras.isEmpty()) {
+         EXTRA_TYPES.put(ragdoll, extras);
+      }
+   }
+
+   private static void addTexture(List<RenderType> out, ResourceLocation texture) {
+      if (Minecraft.getInstance().getResourceManager().getResource(texture).isPresent()) {
+         RenderType type = RenderType.entityCutoutNoCull(texture);
+         if (!out.contains(type)) {
+            out.add(type);
+         }
+      }
+   }
+
+   // Layers that draw held items, armor, head items, wings... They use their own models or the item atlas, not the mob's
+   // cubes, so drawing their types over the body smears the whole atlas across it (skeleton holding a bow).
+   private static final String[] EQUIPMENT_LAYERS = {
+      "iteminhand", "customhead", "elytra", "armor", "carried", "arrow", "stinger", "parrot", "cape", "helditem", "heldblock"
+   };
+
+   private static boolean isEquipmentLayer(Object layer) {
+      String name = layer.getClass().getName().toLowerCase(java.util.Locale.ROOT);
+      for (String token : EQUIPMENT_LAYERS) {
+         if (name.contains(token)) {
+            return true;
+         }
+      }
+
+      return false;
+   }
+
+   private static boolean isAtlas(RenderType type) {
+      return type.toString().contains("textures/atlas");
    }
 
    private static boolean initReflection() {
@@ -189,6 +255,10 @@ public final class RigidDummies {
                continue;
             }
 
+            if (isEquipmentLayer(layer)) {
+               continue;
+            }
+
             // the default mob may already have some of this layer's types (a villager has its biome one), only the
             // extra ones at the end are ours (profession, level badge)
             int skip = 0;
@@ -209,7 +279,7 @@ public final class RigidDummies {
             }
 
             for (RenderType rt : now.subList(skip, now.size())) {
-               if (rt.format() == DefaultVertexFormat.NEW_ENTITY && !extras.contains(rt)) {
+               if (rt.format() == DefaultVertexFormat.NEW_ENTITY && !isAtlas(rt) && !extras.contains(rt)) {
                   extras.add(rt);
                }
             }
