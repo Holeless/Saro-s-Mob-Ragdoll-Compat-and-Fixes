@@ -33,16 +33,20 @@ jobs:
           JAR=$(ls libs/*.jar | head -n1)
           mkdir -p dump
           javap -p -c -cp "$JAR" \
-            de.sarocesch.sarosmobragdoll.client.ClientMobRagdoll \
-            de.sarocesch.sarosmobragdoll.client.ClientRagdollManager \
-            > dump/bytecode.txt
-          javap -p -cp "$JAR" \
-            de.sarocesch.sarosmobragdoll.client.skeleton.MobSkeleton \
-            de.sarocesch.sarosmobragdoll.client.skeleton.Bone \
-            > dump/signatures.txt
-          unzip -l "$JAR" | grep '\.class' > dump/classlist.txt
+            de.sarocesch.sarosmobragdoll.client.skeleton.VanillaModelSkeletonProvider \
+            'de.sarocesch.sarosmobragdoll.client.skeleton.VanillaModelSkeletonProvider$BabyTransform' \
+            'de.sarocesch.sarosmobragdoll.client.skeleton.VanillaModelSkeletonProvider$BoneBuild' \
+            'de.sarocesch.sarosmobragdoll.client.skeleton.VanillaModelSkeletonProvider$NamedPart' \
+            de.sarocesch.sarosmobragdoll.client.skeleton.LayerProbe \
+            de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonLayer \
+            de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonProvider \
+            de.sarocesch.sarosmobragdoll.client.skeleton.ModelPartAccess \
+            > dump/provider.txt
+          javap -p -c -cp "$JAR" \
+            de.sarocesch.sarosmobragdoll.ragdoll.physics.BoneRagdollPhysics \
+            > dump/physics.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: saro-dump
+          name: saro-dump-2
           path: dump/
