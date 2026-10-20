@@ -6,7 +6,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.registries.ForgeRegistries;
 
-/** Client config: {@code config/saros_ragdoll_fix-client.toml}. The ragdolls are simulated client-side, so this is too. */
+/** config/saros_ragdoll_fix-client.toml */
 public final class FixConfig {
    public static final ForgeConfigSpec SPEC;
 
@@ -36,88 +36,71 @@ public final class FixConfig {
    public static final ForgeConfigSpec.BooleanValue FIX_MODEL_SCALE;
    public static final ForgeConfigSpec.BooleanValue DEDUPE_SPAWNS;
 
+   public static final ForgeConfigSpec.BooleanValue LAY_SLEEPERS;
+   public static final ForgeConfigSpec.BooleanValue SLEEP_FACE_DOWN;
+
    static {
       ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
-      b.comment(
-            "Death launch. The original mod throws every mob 6 blocks/s away from the attacker and 2 blocks/s up, with the",
-            "same velocity on every body part, so corpses fly far and stay stiff. These settings replace that.")
+      b.comment("Death launch. The original throws every mob 6 blocks/s away from the attacker and 2 up, same speed on",
+            "every body part, so corpses fly far and stay stiff.")
          .push("launch");
-      FIX_LAUNCH = b.comment("Master switch for this whole section. false = the original mod's behaviour.").define("enabled", true);
-      HORIZONTAL_SCALE = b.comment("Multiplier on the horizontal launch speed (original = 1.0).").defineInRange("horizontalScale", 0.35, 0.0, 2.0);
-      VERTICAL_SCALE = b.comment("Multiplier on the vertical launch speed (original = 1.0).").defineInRange("verticalScale", 0.5, 0.0, 2.0);
-      MAX_LAUNCH_SPEED = b.comment("Hard cap on launch speed in blocks/second.").defineInRange("maxLaunchSpeed", 5.0, 0.0, 50.0);
-      SCALE_BY_SIZE = b.comment("Mobs bigger than a player are pushed less (never more).").define("scaleBySize", true);
-      LIMB_VELOCITY_FACTOR = b.comment(
-            "Fraction of the launch speed given to every part except the body/torso. 1.0 = everything moves as one stiff piece",
-            "(original behaviour). Lower = limbs trail behind and the corpse goes limp sooner.")
+      FIX_LAUNCH = b.comment("false = original launch").define("enabled", true);
+      HORIZONTAL_SCALE = b.comment("Multiplier on the horizontal speed (original = 1.0)").defineInRange("horizontalScale", 0.35, 0.0, 2.0);
+      VERTICAL_SCALE = b.comment("Multiplier on the vertical speed (original = 1.0)").defineInRange("verticalScale", 0.5, 0.0, 2.0);
+      MAX_LAUNCH_SPEED = b.comment("Speed cap, blocks/s").defineInRange("maxLaunchSpeed", 5.0, 0.0, 50.0);
+      SCALE_BY_SIZE = b.comment("Mobs bigger than a player get pushed less").define("scaleBySize", true);
+      LIMB_VELOCITY_FACTOR = b.comment("Speed of the limbs relative to the torso. 1.0 = everything moves as one stiff piece (original)")
          .defineInRange("limbVelocityFactor", 0.2, 0.0, 1.0);
-      SPIN_ON_KILL = b.comment("Topple rate (rad/s) so the body tips over instead of staying upright. 0 = off.").defineInRange("spinOnKill", 2.5, 0.0, 10.0);
-      RANDOM_TOPPLE = b.comment("Tip over in a random direction when almost nothing pushed the body (fall, fire, poison ...).")
+      SPIN_ON_KILL = b.comment("Topple rate in rad/s so the body tips over instead of standing. 0 = off").defineInRange("spinOnKill", 2.5, 0.0, 10.0);
+      RANDOM_TOPPLE = b.comment("Tip over in a random direction when nothing pushed the body (fall damage, fire, poison...)")
          .define("randomToppleWhenNotPushed", true);
-      NO_PUSH_THRESHOLD = b.comment("Horizontal speed (after scaling) below which a body counts as not pushed.").defineInRange("notPushedBelow", 0.8, 0.0, 5.0);
-      NO_PUSH_SPEED = b.comment("Horizontal speed given to a body that was not pushed.").defineInRange("notPushedSpeed", 0.8, 0.0, 5.0);
+      NO_PUSH_THRESHOLD = b.comment("Horizontal speed below which a body counts as not pushed").defineInRange("notPushedBelow", 0.8, 0.0, 5.0);
+      NO_PUSH_SPEED = b.comment("Horizontal speed given to a body that wasn't pushed").defineInRange("notPushedSpeed", 0.8, 0.0, 5.0);
       b.pop();
 
-      b.comment("Joint looseness.").push("joints");
-      FIX_JOINTS = b.comment("Replace the original mod's fixed joint limit.").define("enabled", true);
-      JOINT_LIMIT_DEGREES = b.comment("How far every joint may bend on every axis, in degrees. The original mod uses about 40.")
+      b.comment("Joint looseness").push("joints");
+      FIX_JOINTS = b.comment("Replace the original's fixed joint limit").define("enabled", true);
+      JOINT_LIMIT_DEGREES = b.comment("Max bend per axis in degrees. Original is about 40")
          .defineInRange("jointLimitDegrees", 75.0, 5.0, 150.0);
       b.pop();
 
-      b.comment(
-            "Compatibility for mobs whose model is not a vanilla ModelPart tree (Alex's Mobs/Citadel, Naturalist/GeckoLib ...).",
-            "The original mod falls back to one rigid body for these. It never moved or toppled, and the original mob kept",
-            "standing there. Here the rigid body topples, is drawn with the mob's own renderer, and the original is removed.")
+      b.comment("Mobs whose model isn't a vanilla ModelPart tree (Alex's Mobs, Naturalist...). The original falls back to one",
+            "rigid box for these.")
          .push("compat");
-      CONVERT_GEO = b.comment(
-            "GeckoLib mobs (Naturalist ...): read the mob's .geo.json and build a limb-by-limb skeleton from it, so they ragdoll",
-            "with flopping limbs like vanilla mobs. If a model cannot be converted it falls back to the rigid box.",
-            "false = always use the rigid box.")
+      CONVERT_GEO = b.comment("GeckoLib mobs: build a limb skeleton from the .geo.json so they flop like vanilla mobs.",
+            "Falls back to the rigid box if the model can't be converted.")
          .define("convertGeoModels", true);
-      CONVERT_CITADEL = b.comment(
-            "Citadel mobs (Alex's Mobs ...): copy the mob's boxes into a limb-by-limb skeleton so they ragdoll with flopping",
-            "limbs. If a model cannot be converted it falls back to the rigid box. false = always use the rigid box.")
-         .define("convertCitadelModels", true);
-      GEO_HIDDEN_BONES = b.comment(
-            "Bone names (lower case) that GeckoLib mobs show only in certain states (sleeping, angry ...). They are left out of",
-            "the converted skeleton, otherwise they would be drawn on top of the normal parts. Bones named baby_* are only",
-            "used for baby mobs.")
+      CONVERT_CITADEL = b.comment("Same for Citadel mobs (Alex's Mobs)").define("convertCitadelModels", true);
+      GEO_HIDDEN_BONES = b.comment("Bones (lower case) that GeckoLib mobs only show in some states. They're left out of the",
+            "converted skeleton. baby_* bones are only used for babies.")
          .defineListAllowEmpty("geoHiddenBones", List.of("sleep", "sleeping", "angry", "head_angry", "snout_angry"), o -> o instanceof String);
-      FORCE_RIGID = b.comment(
-            "Mod namespaces (\"alexsmobs\") or single entity ids (\"naturalist:bear\") that always use the rigid real-model path,",
-            "even if the original mod could guess a partial skeleton for them. A GeckoLib mob that converts successfully",
-            "(see convertGeoModels) takes priority over this list.")
+      FORCE_RIGID = b.comment("Namespaces (\"alexsmobs\") or entity ids (\"naturalist:bear\") that always use the rigid path.",
+            "A GeckoLib mob that converts fine ignores this.")
          .defineListAllowEmpty("forceRigid", List.of("alexsmobs", "naturalist"), o -> o instanceof String);
-      OWN_RENDER_DUMMY = b.comment(
-            "Draw each ragdoll from its own copy of the mob that carries the dead mob's variant/colour/profession (and, for rigid",
-            "ragdolls, is turned the right way round). false = the original mod's shared default-variant copy.",
-            "Also needed for copyDamageState below.")
+      OWN_RENDER_DUMMY = b.comment("Draw each ragdoll from its own copy of the mob (variant, colour, profession, facing).",
+            "false = the original's shared default copy. copyDamageState needs this.")
          .define("perRagdollModel", true);
-      REMOVE_ORIGINAL_FOR_RIGID = b.comment(
-            "Remove the dying mob from the client world the moment a rigid or converted GeckoLib ragdoll replaces it. Needed",
-            "because GeckoLib and Citadel renderers do not always honour the original mod's hide trick (frozen duplicate).")
+      REMOVE_ORIGINAL_FOR_RIGID = b.comment("Remove the dying mob from the client world when a rigid or converted ragdoll takes over.",
+            "GeckoLib/Citadel renderers don't always respect the original's hide trick.")
          .define("removeOriginal", true);
       b.pop();
 
-      b.comment("Make the ragdoll a copy of the mob as it was before it died, and fix a few things that made it differ.")
-         .push("fidelity");
-      COPY_DAMAGE_STATE = b.comment(
-            "Copy the state the mob had while alive: its health from before it died (iron golem cracks), its equipment, and any",
-            "overlay that only shows in that state. false = every ragdoll looks like a fresh default mob.")
-         .define("copyDamageState", true);
-      COPY_WOUNDS = b.comment(
-            "Keep the wounds / bullet holes drawn on the mob by Better Blood Overlay (for example from TaCZ guns) when it becomes",
-            "a ragdoll. Does nothing if that mod is not installed.")
+      b.comment("Make the ragdoll look like the mob did").push("fidelity");
+      COPY_DAMAGE_STATE = b.comment("Copy health from before death (iron golem cracks) and equipment").define("copyDamageState", true);
+      COPY_WOUNDS = b.comment("Keep Better Blood Overlay wounds / bullet holes on the ragdoll. Does nothing without that mod")
          .define("copyBloodWounds", true);
-      FIX_MODEL_SCALE = b.comment(
-            "Fix models that scale themselves when drawn and so came out the wrong size as a ragdoll. Currently: adult rabbits",
-            "(they were 1.67 times too big).")
+      FIX_MODEL_SCALE = b.comment("Fix models that scale themselves when drawn (adult rabbits were 1.67x too big)")
          .define("fixModelScale", true);
-      DEDUPE_SPAWNS = b.comment(
-            "Ignore a second ragdoll spawn for the same mob (same entity id, or same kind of mob on the exact same spot in the",
-            "same tick). Stops some GeckoLib mobs from appearing twice. Each ignored spawn is logged as [ragdoll-fix].")
+      DEDUPE_SPAWNS = b.comment("Ignore a second spawn for the same mob (same id, or same type on the same spot in the same tick).",
+            "Some GeckoLib mobs showed up twice. Ignored spawns are logged as [ragdoll-fix].")
          .define("dedupeSpawns", true);
+      b.pop();
+
+      b.comment("Mobs that die in a bed").push("sleeping");
+      LAY_SLEEPERS = b.comment("Mobs that die while sleeping stay lying in the bed instead of standing next to it")
+         .define("layDownSleepers", true);
+      SLEEP_FACE_DOWN = b.comment("Turn this on if sleepers end up face down").define("sleepFaceDown", false);
       b.pop();
 
       SPEC = b.build();
@@ -141,7 +124,6 @@ public final class FixConfig {
       return s;
    }
 
-   /** True if this entity type matches a namespace or full id in {@code compat.forceRigid}. */
    public static boolean isForcedRigid(EntityType<?> type) {
       ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(type);
       if (key == null) {

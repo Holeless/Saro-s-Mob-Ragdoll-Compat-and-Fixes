@@ -1,7 +1,6 @@
 package de.sarocesch.sarosragdollfix;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -9,7 +8,6 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
@@ -20,13 +18,9 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.Entity;
 
-/**
- * Citadel (Alex's Mobs ...) AdvancedEntityModel to a vanilla ModelPart tree. Citadel's boxes use the same space and the
- * same transform order as vanilla parts (rotation point in pixels, Z then Y then X rotation, boxes relative to the
- * rotation point), so this is a direct copy of position, rotation and boxes. Everything is read by reflection, so
- * Citadel is not needed to build this mod and nothing here can crash the game: any failure returns null and the mob
- * keeps the old rigid-box ragdoll.
- */
+// Citadel AdvancedEntityModel (Alex's Mobs...) -> vanilla ModelPart tree. Citadel boxes use the same space and transform
+// order as vanilla parts, so position, rotation and boxes are copied as they are. Citadel is read by reflection and
+// isn't needed to build this mod. Returns null on any failure and the mob keeps the rigid box.
 public final class CitadelModelConverter {
    private static final String ADVANCED_MODEL = "com.github.alexthe666.citadel.client.model.AdvancedEntityModel";
 
@@ -46,7 +40,7 @@ public final class CitadelModelConverter {
             return null;
          }
 
-         // Put the model in its standing pose (the models reset themselves to their default pose in setupAnim).
+         // models reset to their default pose in setupAnim
          try {
             ((EntityModel<Entity>)model).setupAnim(dummy, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
          } catch (Throwable t) {
@@ -135,7 +129,7 @@ public final class CitadelModelConverter {
       }
    }
 
-   /** One box. Position and size come from posX1..posZ2; texture origin and inflate are recovered from its quads. */
+   // Position and size are posX1..posZ2. Texture origin and inflate are worked out from the quads.
    private static void addCube(CubeListBuilder builder, Object cube, boolean mirror, int tw, int th) throws Exception {
       float x1 = num(cube, "posX1");
       float y1 = num(cube, "posY1");

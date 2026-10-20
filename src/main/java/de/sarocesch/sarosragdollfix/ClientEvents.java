@@ -7,7 +7,6 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-/** Per-tick bookkeeping: remember mob health while alive, and keep removed originals removed. */
 @Mod.EventBusSubscriber(modid = SarosRagdollFix.MODID, value = Dist.CLIENT)
 public final class ClientEvents {
    private ClientEvents() {
@@ -23,10 +22,12 @@ public final class ClientEvents {
       if (level == null) {
          HealthTracker.clear();
          RagdollCleanup.clear();
+         SleepTracker.clear();
          return;
       }
 
       HealthTracker.tick(level);
       RagdollCleanup.tick(level);
+      SleepTracker.tick(level);
    }
 }

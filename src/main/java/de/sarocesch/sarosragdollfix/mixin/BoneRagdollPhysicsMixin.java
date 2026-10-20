@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Loosens the joints: the original hardcodes +-0.7 rad (about 40 degrees) on every axis of every joint. */
+// the original hardcodes +-0.7 rad (about 40 degrees) on every axis of every joint
 @Mixin(value = BoneRagdollPhysics.class, remap = false)
 public abstract class BoneRagdollPhysicsMixin {
    @Shadow

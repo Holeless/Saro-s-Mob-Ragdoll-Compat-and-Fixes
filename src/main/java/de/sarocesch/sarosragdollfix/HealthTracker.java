@@ -6,10 +6,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
-/**
- * Remembers the last health fraction each living entity had while it was still alive. When the ragdoll spawns the mob is
- * already at 0 health, so without this a damaged iron golem would be copied as "dead" or (before) as "full health".
- */
+// Last health fraction seen while alive. The mob is already at 0 when the ragdoll spawns.
 public final class HealthTracker {
    private static final Map<Integer, Float> LAST = new HashMap<>();
    private static int ticks;
@@ -32,7 +29,7 @@ public final class HealthTracker {
       }
    }
 
-   /** Health fraction (0..1] before the mob died, or -1 if never seen alive. */
+   /** 0..1, or -1 if we never saw it alive. */
    public static float lastFraction(int entityId) {
       Float f = LAST.get(entityId);
       return f == null ? -1.0F : f;

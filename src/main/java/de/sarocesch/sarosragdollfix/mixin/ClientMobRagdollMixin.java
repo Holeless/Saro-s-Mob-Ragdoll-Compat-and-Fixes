@@ -36,7 +36,7 @@ public abstract class ClientMobRagdollMixin {
       throw new AssertionError();
    }
 
-   /** Rigid ragdolls: draw from their own copy of the mob (right variant, right way round). */
+   // rigid ragdolls: draw from their own copy of the mob
    @Redirect(
       method = "renderRigid",
       at = @At(
@@ -50,7 +50,7 @@ public abstract class ClientMobRagdollMixin {
       return own != null ? own : skeleton.dummy;
    }
 
-   /** Normal ragdolls: use this mob's own texture instead of the one cached per entity type (white rabbit stays white). */
+   // normal ragdolls: this mob's texture, not the one cached per type (so a white rabbit stays white)
    @Redirect(
       method = "render",
       at = @At(
@@ -63,7 +63,7 @@ public abstract class ClientMobRagdollMixin {
       return RigidDummies.textureFor((ClientMobRagdoll)(Object)this, skeleton);
    }
 
-   /** Overlay layers (villager profession, biome ...): use this mob's own, not the cached default mob's. */
+   // overlay layers (villager profession, biome...)
    @Redirect(
       method = "renderLayersFor",
       at = @At(
@@ -76,11 +76,8 @@ public abstract class ClientMobRagdollMixin {
       return RigidDummies.layerTypeFor((ClientMobRagdoll)(Object)this, layer.renderType);
    }
 
-   /**
-    * After the original's layers for one bone: draw what only THIS mob had. Damage overlays (iron golem cracks) are the same
-    * cubes with another texture; wounds / bullet holes are the same cubes with the wound texture of Better Blood Overlay.
-    * The pose stack is already at this bone, exactly as for the original's own layers.
-    */
+   // After the original's layers for a bone, draw what only this mob has: damage overlays (golem cracks) and wounds.
+   // Both are the same cubes with a different texture. The pose stack is already at the bone.
    @Inject(method = "renderLayersFor", at = @At("RETURN"))
    private void saros_fix$ownOverlays(int boneIndex, Bone bone, PoseStack pose, MultiBufferSource buffers, int light, float alpha, CallbackInfo ci) {
       ClientMobRagdoll self = (ClientMobRagdoll)(Object)this;
@@ -112,7 +109,6 @@ public abstract class ClientMobRagdollMixin {
       }
    }
 
-   /** Frees the wound textures this ragdoll owns. */
    @Inject(method = "remove", at = @At("HEAD"))
    private void saros_fix$release(CallbackInfo ci) {
       RigidDummies.release((ClientMobRagdoll)(Object)this);

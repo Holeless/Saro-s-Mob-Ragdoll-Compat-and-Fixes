@@ -25,14 +25,10 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 
-/**
- * Bedrock/GeckoLib geometry (.geo.json) to a vanilla ModelPart tree.
- *
- * <p>Both formats use pixels (1/16 block) and the same box-UV layout, and both put the front at -Z with +X on the same
- * side. Only Y differs: Bedrock is Y-up with the feet at 0, the vanilla model space is Y-down with the feet at 24. So a
- * point (x, y, z) becomes (x, 24 - y, z), and relative to a parent pivot (dx, -dy, dz). Rotations are in the same ZYX
- * order and carry over unchanged (the Y mirror and GeckoLib's own sign flips cancel out), as in Blockbench's exporter.
- */
+// Bedrock / GeckoLib .geo.json -> vanilla ModelPart tree.
+// Same pixel units and box UV layout, front is -Z in both. Only Y differs: Bedrock is Y up with the feet at 0, vanilla is
+// Y down with the feet at 24. So (x, y, z) -> (x, 24 - y, z), and (dx, -dy, dz) relative to a parent pivot. Rotations
+// keep the same ZYX order and carry over as they are (same as Blockbench's exporter).
 public final class GeoModelConverter {
    private GeoModelConverter() {
    }
@@ -150,6 +146,7 @@ public final class GeoModelConverter {
          name, cubes, PartPose.offsetAndRotation(ox, oy, oz, rad(rot[0]), rad(rot[1]), rad(rot[2]))
       );
 
+      // rotated cubes get a child part of their own
       int i = 0;
       for (JsonObject c : rotated) {
          float[] cp = c.has("pivot") ? vec(c, "pivot") : p;
@@ -171,7 +168,7 @@ public final class GeoModelConverter {
       }
    }
 
-   /** One box, positioned relative to {@code pv} (the pivot of the part that owns it). */
+   // pv is the pivot of the part that owns the box
    private static void addCube(CubeListBuilder builder, JsonObject c, float[] pv, boolean boneMirror, float boneInflate) {
       float[] o = vec(c, "origin");
       float[] s = vec(c, "size");
@@ -185,7 +182,7 @@ public final class GeoModelConverter {
             u = Math.round(uv.getAsJsonArray().get(0).getAsFloat());
             v = Math.round(uv.getAsJsonArray().get(1).getAsFloat());
          } else if (uv.isJsonObject() && uv.getAsJsonObject().has("north")) {
-            // Per-face UV: approximate with the box layout derived from the front (north) face.
+            // per-face uv: work the box layout out from the north face
             JsonObject north = uv.getAsJsonObject().getAsJsonObject("north");
             if (north.has("uv")) {
                JsonArray a = north.getAsJsonArray("uv");

@@ -14,14 +14,11 @@ import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 
-/**
- * Keeps the wounds / bullet holes of Better Blood Overlay on a ragdoll. All by reflection, so the mod is optional and
- * nothing here can crash the game: any failure just means "no wounds on the ragdoll".
- *
- * <p>Why a copy: that mod stores wounds per entity UUID and deletes them (and frees their textures) when the entity leaves
- * the world. The original mob is removed or dies right when the ragdoll starts, so the ragdoll has to own its own frozen
- * copy of the wound textures, taken before that happens. The copy is freed when the ragdoll is removed.
- */
+// Keeps Better Blood Overlay wounds on the ragdoll. All reflection, so the mod stays optional and if anything doesn't
+// match we just get no wounds.
+//
+// Better Blood Overlay stores wounds per entity UUID and frees the textures when the entity leaves the world. The original
+// mob goes away right when the ragdoll starts, so the ragdoll keeps its own copy of the textures and frees them when it's removed.
 public final class WoundCompat {
    private static final String PKG = "tailorworks.betterbloodoverlay_1_20_1.";
 
@@ -42,7 +39,7 @@ public final class WoundCompat {
    private WoundCompat() {
    }
 
-   /** One frozen wound: its own texture, the render type for it, tint and strength at the moment of death. */
+   /** One wound: own texture, render type, tint and strength at the moment of death. */
    public static final class Wound {
       private final DynamicTexture texture;
       public final RenderType type;
@@ -115,7 +112,7 @@ public final class WoundCompat {
       return ok;
    }
 
-   /** Freeze the entity's current wounds. Call while the entity is still in the world. Null if there are none. */
+   /** Call while the entity is still in the world. Null if it has no wounds. */
    @Nullable
    public static List<Wound> capture(Entity live, long gameTime) {
       if (!init()) {

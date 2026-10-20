@@ -17,11 +17,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 
-/**
- * Gives GeckoLib mobs a real multi-bone skeleton. The .geo.json of the mob is converted to a vanilla ModelPart tree, and
- * Saro's own skeleton builder is run on it exactly as it would be for a vanilla model, so limbs get their own bodies and
- * joints and flop like vanilla mobs.
- */
+// Real multi-bone skeletons for GeckoLib / Citadel mobs: the model is converted to a ModelPart tree and Saro's own
+// builder runs on it like it would for a vanilla mob.
 public final class GeoSkeletons {
    private static final ThreadLocal<EntityModel<?>> OVERRIDE = new ThreadLocal<>();
    private static final Set<MobSkeleton> CONVERTED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
@@ -30,7 +27,7 @@ public final class GeoSkeletons {
    private GeoSkeletons() {
    }
 
-   /** The synthetic model to use for the {@code build} call that is running right now, or null. */
+   /** Model to use for the build() call running right now, or null. */
    @Nullable
    public static EntityModel<?> override() {
       return OVERRIDE.get();
@@ -40,7 +37,7 @@ public final class GeoSkeletons {
       return CONVERTED.contains(skeleton);
    }
 
-   /** Saro's own (private) modelOf, for when there is nothing to override. */
+   // Saro's private modelOf
    @Nullable
    public static EntityModel<?> originalModelOf(EntityRenderer<?> renderer) {
       try {
@@ -57,7 +54,7 @@ public final class GeoSkeletons {
       }
    }
 
-   /** @return a skeleton with one body per bone, or null if this mob is not a convertible GeckoLib mob. */
+   /** Null if this isn't a convertible mob. */
    @Nullable
    public static MobSkeleton tryBuild(VanillaModelSkeletonProvider provider, EntityType<?> type, ClientLevel level, boolean baby) {
       try {
@@ -116,7 +113,7 @@ public final class GeoSkeletons {
       }
    }
 
-   /** Asks the GeckoLib renderer which model file it uses; falls back to geo/entity/&lt;name&gt;.geo.json. */
+   // ask the GeckoLib renderer which model it uses, otherwise guess geo/entity/<name>.geo.json
    @Nullable
    private static ResourceLocation resolveGeo(EntityRenderer<?> renderer, Entity dummy, EntityType<?> type) {
       try {

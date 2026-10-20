@@ -2,7 +2,7 @@ package de.sarocesch.sarosragdollfix;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
-/** Multiplies the colour of everything written through it. Used for wound overlays whose blood colour is not red. */
+// Multiplies the colour of whatever goes through it, for wounds with non-red blood.
 public final class TintedConsumer implements VertexConsumer {
    private final VertexConsumer inner;
    private final float r;

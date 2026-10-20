@@ -14,6 +14,8 @@ import de.sarocesch.sarosragdollfix.RagdollCleanup;
 import de.sarocesch.sarosragdollfix.RagdollLaunch;
 import de.sarocesch.sarosragdollfix.RigidDummies;
 import de.sarocesch.sarosragdollfix.SarosRagdollFix;
+import de.sarocesch.sarosragdollfix.SleepPose;
+import de.sarocesch.sarosragdollfix.SleepTracker;
 import de.sarocesch.sarosragdollfix.WoundCompat;
 import java.util.List;
 import java.util.Random;
@@ -35,6 +37,10 @@ public abstract class ClientRagdollManagerMixin {
    @Unique
    private static final Random SAROS_FIX_RANDOM = new Random();
 
+   // a sleeper's feet end up this far above the entity position (bed surface is a bit lower than that)
+   @Unique
+   private static final double SLEEP_LIFT = 0.1;
+
    @Shadow
    @Final
    private List<ClientMobRagdoll> ragdolls;
@@ -45,17 +51,38 @@ public abstract class ClientRagdollManagerMixin {
    @Unique
    private EntityType<?> saros_fix$type;
 
-   /** Wounds frozen at the start of spawn(), while the mob is still in the world. */
+   // frozen at the start of spawn(), while the mob is still in the world
    @Unique
    private List<WoundCompat.Wound> saros_fix$wounds;
+
+   // set when the mob died in a bed
+   @Unique
+   private SleepTracker.Spot saros_fix$sleep;
+
+   @Unique
+   private double saros_fix$x;
+
+   @Unique
+   private double saros_fix$y;
+
+   @Unique
+   private double saros_fix$z;
+
+   @Unique
+   private float saros_fix$yaw;
 
    @Inject(method = "spawn", at = @At("HEAD"), cancellable = true)
    private void saros_fix$spawnHead(
       EntityType<?> type, int entityId, double x, double y, double z, float bodyYaw, float vx, float vy, float vz, boolean baby, int lifeTicks, CallbackInfo ci
    ) {
       this.saros_fix$wounds = null;
+      this.saros_fix$sleep = null;
       this.saros_fix$type = type;
       this.saros_fix$sizeBefore = this.ragdolls.size();
+      this.saros_fix$x = x;
+      this.saros_fix$y = y;
+      this.saros_fix$z = z;
+      this.saros_fix$yaw = bodyYaw;
 
       ClientLevel level = Minecraft.getInstance().level;
       if (level == null) {
@@ -68,12 +95,14 @@ public abstract class ClientRagdollManagerMixin {
          return;
       }
 
-      // Must happen here: once the original is removed (below, or by the game) Better Blood Overlay deletes its wounds.
-      if (FixConfig.COPY_WOUNDS.get() && entityId >= 0) {
-         Entity live = level.getEntity(entityId);
-         if (live != null) {
-            this.saros_fix$wounds = WoundCompat.capture(live, level.getGameTime());
-         }
+      Entity live = entityId >= 0 ? level.getEntity(entityId) : null;
+      if (FixConfig.LAY_SLEEPERS.get() && entityId >= 0) {
+         this.saros_fix$sleep = SleepTracker.take(live, entityId, level.getGameTime());
+      }
+
+      // has to happen here, once the original is gone Better Blood Overlay deletes its wounds
+      if (FixConfig.COPY_WOUNDS.get() && live != null) {
+         this.saros_fix$wounds = WoundCompat.capture(live, level.getGameTime());
       }
    }
 
@@ -82,6 +111,18 @@ public abstract class ClientRagdollManagerMixin {
       at = @At(value = "INVOKE", target = "Lde/sarocesch/sarosmobragdoll/ragdoll/physics/BoneRagdollPhysics;setUniformVelocity(Lcom/jme3/math/Vector3f;)V")
    )
    private void saros_fix$launch(BoneRagdollPhysics physics, Vector3f velocity) {
+      SleepTracker.Spot bed = this.saros_fix$sleep;
+      if (bed != null) {
+         this.saros_fix$sleep = null;
+         // no launch, the body just lies where it was sleeping
+         Vector3f head = new Vector3f(bed.dirX, 0.0F, bed.dirZ);
+         double back = bed.eyeHeight - 0.1;
+         Vector3f lying = new Vector3f((float)(bed.x - bed.dirX * back), (float)(bed.y + SLEEP_LIFT), (float)(bed.z - bed.dirZ * back));
+         Vector3f standing = new Vector3f((float)this.saros_fix$x, (float)this.saros_fix$y, (float)this.saros_fix$z);
+         SleepPose.layDown(physics, standing, this.saros_fix$yaw, head, lying, FixConfig.SLEEP_FACE_DOWN.get());
+         return;
+      }
+
       EntityType<?> type = this.saros_fix$type;
       if (FixConfig.FIX_LAUNCH.get() && type != null) {
          RagdollLaunch.apply(physics, velocity, (double)type.getWidth(), (double)type.getHeight(), FixConfig.settings(), SAROS_FIX_RANDOM);
@@ -101,7 +142,7 @@ public abstract class ClientRagdollManagerMixin {
       ModelScaleFix.begin(type, baby);
       try {
          if (FixConfig.CONVERT_GEO.get() || FixConfig.CONVERT_CITADEL.get()) {
-            // GeckoLib mobs: convert the .geo.json so they get limbs. Null = not convertible, use the old behaviour.
+            // null means it can't be converted, carry on the old way
             MobSkeleton converted = GeoSkeletons.tryBuild(provider, type, level, baby);
             if (converted != null) {
                return converted;
@@ -114,16 +155,14 @@ public abstract class ClientRagdollManagerMixin {
       }
    }
 
-   /**
-    * After a ragdoll was added. Rigid: give it its own render copy and remove the original entity. Normal (ModelPart):
-    * remember this mob's own texture, overlays and wounds so the variant, damage and bullet holes are kept.
-    */
+   // Rigid: give it its own render copy and remove the original. Normal: remember this mob's texture, overlays and wounds.
    @Inject(method = "spawn", at = @At("RETURN"))
    private void saros_fix$spawnTail(
       EntityType<?> type, int entityId, double x, double y, double z, float bodyYaw, float vx, float vy, float vz, boolean baby, int lifeTicks, CallbackInfo ci
    ) {
       List<WoundCompat.Wound> wounds = this.saros_fix$wounds;
       this.saros_fix$wounds = null;
+      this.saros_fix$sleep = null;
 
       if (this.ragdolls.size() <= this.saros_fix$sizeBefore) {
          WoundCompat.releaseAll(wounds);
@@ -150,7 +189,7 @@ public abstract class ClientRagdollManagerMixin {
             RigidDummies.captureLook(rag, skeleton, type, level, live, baby);
          }
 
-         // Converted GeckoLib mobs: their renderer ignores the original mod's hide trick, so remove the original.
+         // converted GeckoLib mobs ignore the original mod's hide trick, so remove the original
          if (GeoSkeletons.isConverted(skeleton) && FixConfig.REMOVE_ORIGINAL_FOR_RIGID.get()) {
             RagdollCleanup.discard(level, entityId, live);
          }

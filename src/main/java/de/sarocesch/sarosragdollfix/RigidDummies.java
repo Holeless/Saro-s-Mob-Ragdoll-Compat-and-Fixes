@@ -20,7 +20,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 
-/** Per-ragdoll render data. Weak keys: entries disappear with their ragdoll. */
+// Per-ragdoll render data. Weak keys, so entries go away with their ragdoll.
 public final class RigidDummies {
    private static final Map<ClientMobRagdoll, Entity> MAP = Collections.synchronizedMap(new WeakHashMap<>());
    private static final Map<ClientMobRagdoll, ResourceLocation> TEXTURES = Collections.synchronizedMap(new WeakHashMap<>());
@@ -45,13 +45,11 @@ public final class RigidDummies {
       return MAP.get(ragdoll);
    }
 
-   /** Texture of this ragdoll's own mob (right rabbit colour etc.), or the shared one if we have none. */
    public static ResourceLocation textureFor(ClientMobRagdoll ragdoll, MobSkeleton skeleton) {
       ResourceLocation own = TEXTURES.get(ragdoll);
       return own != null ? own : skeleton.texture;
    }
 
-   /** Render type for an overlay layer (villager profession, biome ...) of this ragdoll's own mob. */
    public static RenderType layerTypeFor(ClientMobRagdoll ragdoll, RenderType shared) {
       Map<RenderType, RenderType> m = LAYER_TYPES.get(ragdoll);
       if (m == null) {
@@ -62,13 +60,12 @@ public final class RigidDummies {
       return own != null ? own : shared;
    }
 
-   /** Overlays that only THIS mob has (iron golem cracks ...). Null if none. */
+   /** Overlays only this mob has (golem cracks), or null. */
    @Nullable
    public static List<RenderType> extraTypes(ClientMobRagdoll ragdoll) {
       return EXTRA_TYPES.get(ragdoll);
    }
 
-   /** Frozen wounds / bullet holes of this ragdoll's mob. Null if none. */
    @Nullable
    public static List<WoundCompat.Wound> wounds(ClientMobRagdoll ragdoll) {
       return WOUNDS.get(ragdoll);
@@ -78,16 +75,13 @@ public final class RigidDummies {
       WOUNDS.put(ragdoll, wounds);
    }
 
-   /** Called when the ragdoll is removed: frees the wound textures it owns. */
+   /** Ragdoll removed, free its wound textures. */
    public static void release(ClientMobRagdoll ragdoll) {
       List<WoundCompat.Wound> w = WOUNDS.remove(ragdoll);
       WoundCompat.releaseAll(w);
    }
 
-   /**
-    * For normal (ModelPart) ragdolls: ask the mob's own renderer which texture and which overlay layers THIS mob (with its
-    * variant, villager profession, damage ...) uses. The original mod caches one of each per entity type.
-    */
+   // Normal ragdolls: ask the mob's renderer which texture and layers this mob uses. The original caches one per type.
    @SuppressWarnings({"unchecked", "rawtypes"})
    public static void captureLook(ClientMobRagdoll ragdoll, MobSkeleton skeleton, EntityType<?> type, ClientLevel level, @Nullable Entity live, boolean baby) {
       if (skeleton.renderer == null) {
@@ -138,10 +132,8 @@ public final class RigidDummies {
       return typesUsedBy != null && layerObjects != null;
    }
 
-   /**
-    * Saro bakes each overlay layer's RenderType from one shared default mob. Ask every layer again for this mob and
-    * remember old to new, so the layer can be redirected at render time.
-    */
+   // Saro bakes each layer's RenderType from one shared default mob. Ask every layer again for this mob and remember
+   // old -> new so the layer can be redirected when drawing.
    @SuppressWarnings("unchecked")
    private static void captureLayers(ClientMobRagdoll ragdoll, MobSkeleton skeleton, Entity dummy) {
       if (skeleton.layers == null || skeleton.layers.isEmpty() || skeleton.dummy == null) {
@@ -171,11 +163,9 @@ public final class RigidDummies {
       }
    }
 
-   /**
-    * Layers that draw nothing on the shared default mob but do draw on THIS mob, so the original mod never collected them.
-    * The iron golem crack layer is the example: the default golem is undamaged, so the layer was dropped and every golem
-    * ragdoll came out like new. Only layers that re-draw the mob's own model are taken (same cubes, other texture).
-    */
+   // Layers that draw nothing on the shared default mob but do on this one, so the original never collected them.
+   // Iron golem cracks: the default golem is undamaged so every golem ragdoll came out like new. Only layers that redraw
+   // the mob's own model are taken (same cubes, other texture).
    @SuppressWarnings("unchecked")
    private static void captureExtras(ClientMobRagdoll ragdoll, MobSkeleton skeleton, Entity dummy) {
       if (skeleton.renderer == null) {

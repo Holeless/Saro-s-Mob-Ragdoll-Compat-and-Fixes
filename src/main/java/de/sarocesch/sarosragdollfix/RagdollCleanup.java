@@ -10,15 +10,8 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 
-/**
- * Two things that stop duplicated corpses:
- * <ul>
- * <li>a spawn guard: the original mod makes one ragdoll per {@code spawn} call and never checks, so a mob that triggers the
- * call twice (some GeckoLib mobs die twice, or send two death packets) got two ragdolls on top of each other;</li>
- * <li>a short removal watch: after the original mob is removed it is checked again for a few seconds and removed again if
- * it comes back (GeckoLib mobs can be re-added by the server during their own death animation).</li>
- * </ul>
- */
+// Stops doubled corpses. Some GeckoLib mobs trigger spawn() twice, and get re-added by the server while they play their
+// death animation, so we ignore repeat spawns and keep checking that the removed original stays removed for a few seconds.
 public final class RagdollCleanup {
    private static final int SPAWN_MEMORY_TICKS = 600;
    private static final int WATCH_TICKS = 60;
@@ -46,7 +39,6 @@ public final class RagdollCleanup {
    private RagdollCleanup() {
    }
 
-   /** True if this spawn call is a repeat of one already handled. */
    public static boolean isDuplicate(EntityType<?> type, int entityId, double x, double y, double z, long now) {
       if (entityId >= 0) {
          Long t = SPAWNED.get(entityId);
@@ -55,7 +47,7 @@ public final class RagdollCleanup {
          }
       }
 
-      // Same kind of mob, same tick, the exact same spot: two ragdolls would sit inside each other.
+      // same type, same tick, same spot
       for (Recent r : RECENT) {
          if (r.type == type && Math.abs(now - r.time) <= 1) {
             double dx = r.x - x;
@@ -75,7 +67,6 @@ public final class RagdollCleanup {
       return false;
    }
 
-   /** Hide and remove the original mob now, and keep checking for a few seconds. */
    public static void discard(@Nullable ClientLevel level, int entityId, @Nullable Entity live) {
       if (level == null || entityId < 0) {
          return;

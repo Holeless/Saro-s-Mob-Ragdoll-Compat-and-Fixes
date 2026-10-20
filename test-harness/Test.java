@@ -5,6 +5,7 @@ import com.jme3.math.*;
 import de.sarocesch.sarosmobragdoll.client.skeleton.Bone;
 import de.sarocesch.sarosmobragdoll.ragdoll.physics.*;
 import de.sarocesch.sarosragdollfix.RagdollLaunch;
+import de.sarocesch.sarosragdollfix.SleepPose;
 import java.lang.reflect.Field;
 import java.util.*;
 
@@ -33,35 +34,59 @@ public class Test {
   }
   static float tilt(Quaternion q){ Vector3f up=q.mult(new Vector3f(0,1,0),new Vector3f()); return (float)Math.toDegrees(Math.acos(Math.max(-1,Math.min(1,up.y)))); }
 
-  static void run(String label, List<Bone> bones, boolean old, Vector3f incoming, double w, double h, RagdollLaunch.Settings s) throws Exception {
+  static int heaviest(BoneRagdollPhysics p) {
+    int root = 0; float hv = -1;
+    for (int i = 0; i < p.size(); i++) if (p.getBody(i).getMass() > hv) { hv = p.getBody(i).getMass(); root = i; }
+    return root;
+  }
+
+  static BasePhysicsWorld floorWorld() {
     BasePhysicsWorld world = new BasePhysicsWorld();
     PhysicsRigidBody floor = new PhysicsRigidBody(new BoxCollisionShape(100,1,100), 0f);
     floor.setPhysicsLocation(new Vector3f(0,-1,0)); floor.setFriction(0.9f); floor.setCollisionGroup(1); floor.setCollideWithGroups(2);
     world.addCollisionObject(floor);
+    return world;
+  }
+
+  static void run(String label, List<Bone> bones, boolean old, Vector3f incoming, double w, double h, RagdollLaunch.Settings s) throws Exception {
+    BasePhysicsWorld world = floorWorld();
     BoneRagdollPhysics p = new BoneRagdollPhysics();
     p.build(bones, 0, new Vector3f(0,0,0), 180f);
-    if (!old) { // exactly what the mixin does after build()
+    if (!old) { // same as the mixin, right after build()
       Field jf = BoneRagdollPhysics.class.getDeclaredField("joints"); jf.setAccessible(true);
       RagdollLaunch.applyJointLimits((List<PhysicsJoint>) jf.get(p), s.jointLimitDegrees);
     }
     p.addToWorld(world);
     if (old) p.setUniformVelocity(incoming); else RagdollLaunch.apply(p, incoming, w, h, s, new Random(7));
-    Vector3f pos = new Vector3f(); float[] marks = {0.25f,0.5f,1f,2f};
+    int root = heaviest(p);
+    float[] marks = {0.25f,0.5f,1f,2f};
     StringBuilder sb = new StringBuilder();
-    float peak=0;
     for (int t=1;t<=200;t++){ p.clampVelocities(); world.space.update(0.05f);
-      p.getBody(0).getPhysicsLocation(pos);
-      int root=0; float hv=-1; for(int i=0;i<p.size();i++){ if(p.getBody(i).getMass()>hv){hv=p.getBody(i).getMass();root=i;} }
-      p.getBody(root).getPhysicsLocation(pos);
       float tl = tilt(p.getBody(root).getPhysicsRotation(null));
       for (float m: marks) if (Math.abs(t*0.05f-m)<1e-4) sb.append(String.format(" t=%.2f:tilt=%3.0f", m, tl));
     }
-    Vector3f end = new Vector3f(); int root=0; float hv=-1; for(int i=0;i<p.size();i++) if(p.getBody(i).getMass()>hv){hv=p.getBody(i).getMass();root=i;}
+    Vector3f end = new Vector3f();
     p.getBody(root).getPhysicsLocation(end);
     float finalTilt = tilt(p.getBody(root).getPhysicsRotation(null));
     System.out.printf("%-46s travel=%5.2f blocks | %s | final tilt=%3.0f%n", label, Math.hypot(end.x,end.z), sb, finalTilt);
     p.removeFromWorld();
   }
+
+  /** a sleeper laid down with its head towards +X, feet at (0, 0.1, 0): torso should end up flat and the head on the +X side */
+  static void sleep(String label, boolean faceDown) throws Exception {
+    BasePhysicsWorld world = floorWorld();
+    BoneRagdollPhysics p = new BoneRagdollPhysics();
+    p.build(humanoid(), 0, new Vector3f(0,0,0), 180f);
+    p.addToWorld(world);
+    SleepPose.layDown(p, new Vector3f(0,0,0), 180f, new Vector3f(1,0,0), new Vector3f(0,0.1f,0), faceDown);
+    for (int t=0;t<100;t++){ p.clampVelocities(); world.space.update(0.05f); }
+    Vector3f torso = new Vector3f(), head = new Vector3f();
+    p.getBody(0).getPhysicsLocation(torso);
+    p.getBody(1).getPhysicsLocation(head);
+    System.out.printf("%-46s torso tilt=%3.0f | head is %+.2f blocks along +X from the torso%n", label, tilt(p.getBody(0).getPhysicsRotation(null)), head.x - torso.x);
+    p.removeFromWorld();
+  }
+
   /** Extracts the Bullet native that ships inside Saro's jar (same as the mod does) and loads it. */
   static void loadNative() throws Exception {
     String os = System.getProperty("os.name","").toLowerCase(), arch = System.getProperty("os.arch","").toLowerCase();
@@ -96,5 +121,8 @@ public class Test {
     System.out.println("--- rigid box, small mob 0.4 x 0.5 (chicken-like)");
     run("OLD  hit", rigid(.4f,.5f), true, hit, .4, .5, s);
     run("NEW  hit", rigid(.4f,.5f), false, hit, .4, .5, s);
+    System.out.println("--- sleeping (laid down, head towards +X)");
+    sleep("on the back", false);
+    sleep("face down", true);
   }
 }

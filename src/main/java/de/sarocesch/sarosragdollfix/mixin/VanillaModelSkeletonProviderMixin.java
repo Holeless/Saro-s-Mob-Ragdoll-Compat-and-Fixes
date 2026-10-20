@@ -21,7 +21,7 @@ public abstract class VanillaModelSkeletonProviderMixin {
    @Shadow
    protected abstract void dfs(ModelPart part, String name, ModelPart parent, Matrix4f prefix, float scale, int depth, List<?> out);
 
-   /** While a GeckoLib mob is being converted, feed Saro's builder the converted vanilla-style model instead of nothing. */
+   // while a GeckoLib/Citadel mob is being converted, hand the builder the converted model
    @Redirect(
       method = BUILD,
       at = @At(
@@ -34,10 +34,7 @@ public abstract class VanillaModelSkeletonProviderMixin {
       return forced != null ? forced : GeoSkeletons.originalModelOf(renderer);
    }
 
-   /**
-    * Models that scale themselves inside renderToBuffer (adult rabbit: scale 0.6, lift 1 block) get the same scale here, so
-    * the ragdoll bodies and the drawn parts have the real mob's size. Does nothing unless ModelScaleFix.begin() said so.
-    */
+   // adult rabbit etc: apply the model's own scale so bodies and drawn parts have the real size (see ModelScaleFix)
    @Redirect(
       method = BUILD,
       at = @At(
