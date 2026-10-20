@@ -41,6 +41,8 @@ jobs:
             de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonLayer \
             de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonProvider \
             de.sarocesch.sarosmobragdoll.client.skeleton.ModelPartAccess \
+            de.sarocesch.sarosmobragdoll.client.ClientMobRagdoll \
+            de.sarocesch.sarosmobragdoll.client.ClientRagdollManager \
             > dump/provider.txt
           javap -p -c -cp "$JAR" \
             de.sarocesch.sarosmobragdoll.ragdoll.physics.BoneRagdollPhysics \
