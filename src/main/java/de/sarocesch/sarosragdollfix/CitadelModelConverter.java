@@ -27,84 +27,110 @@ public final class CitadelModelConverter {
    private CitadelModelConverter() {
    }
 
-   @Nullable
-   @SuppressWarnings("unchecked")
-   public static GeoSyntheticModel convert(EntityRenderer<?> renderer, Entity dummy) {
-      try {
-         if (!(renderer instanceof LivingEntityRenderer<?, ?> living)) {
-            return null;
-         }
-
-         EntityModel<?> model = living.getModel();
-         if (model == null || !isAdvanced(model.getClass())) {
-            return null;
-         }
-
-         // models reset to their default pose in setupAnim
-         try {
-            ((EntityModel<Entity>)model).setupAnim(dummy, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
-         } catch (Throwable t) {
-            SarosRagdollFix.LOG.debug("[ragdoll-fix] citadel setupAnim failed, using default pose", t);
-         }
-
-         int tw = intField(model, "texWidth", 64);
-         int th = intField(model, "texHeight", 32);
-         Iterable<?> all = (Iterable<?>)model.getClass().getMethod("getAllParts").invoke(model);
-         List<Object> parts = new ArrayList<>();
-         for (Object p : all) {
-            if (p != null) {
-               parts.add(p);
-            }
-         }
-
-         if (parts.isEmpty()) {
-            return null;
-         }
-
-         Set<Object> isChild = Collections.newSetFromMap(new IdentityHashMap<>());
-         for (Object p : parts) {
-            for (Object c : children(p)) {
-               isChild.add(c);
-            }
-         }
-
-         MeshDefinition mesh = new MeshDefinition();
-         PartDefinition rootDef = mesh.getRoot();
-         int[] cubes = new int[1];
-         int i = 0;
-         for (Object p : parts) {
-            if (!isChild.contains(p)) {
-               add(rootDef, p, "p" + i++, tw, th, cubes, 0);
-            }
-         }
-
-         if (cubes[0] == 0) {
-            return null;
-         }
-
-         return new GeoSyntheticModel(LayerDefinition.create(mesh, tw, th).bakeRoot());
-      } catch (Throwable t) {
-         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not convert citadel model", t);
+@Nullable
+@SuppressWarnings("unchecked")
+public static GeoSyntheticModel convert(EntityRenderer<?> renderer, Entity dummy) {
+   try {
+      if (!(renderer instanceof LivingEntityRenderer<?, ?> living)) {
          return null;
       }
-   }
 
-   private static boolean isAdvanced(Class<?> c) {
-      for (Class<?> k = c; k != null; k = k.getSuperclass()) {
-         if (k.getName().equals(ADVANCED_MODEL)) {
-            return true;
+      EntityModel<?> model = living.getModel();
+      if (model == null || !isAdvanced(model.getClass())) {
+         return null;
+      }
+
+      Iterable<?> all = (Iterable<?>)model.getClass().getMethod("getAllParts").invoke(model);
+      List<Object> parts = new ArrayList<>();
+      for (Object p : all) {
+         if (p != null) {
+            parts.add(p);
          }
       }
 
-      return false;
-   }
-
-   private static void add(PartDefinition parent, Object box, String name, int tw, int th, int[] cubeCount, int depth) throws Exception {
-      if (depth > 64 || !bool(box, "showModel", true)) {
-         return;
+      if (parts.isEmpty()) {
+         return null;
       }
 
-      CubeListBuilder builder = CubeListBuilder.create();
+      // The model is shared with the live renderer, so it can be in whatever pose the last mob left it in.
+      // Reset it ourselves first, so a setupAnim that throws can't leave us with a stale pose.
+      resetPose(parts);
+      try {
+         ((EntityModel<Entity>)model).setupAnim(dummy, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
+      } catch (Throwable t) {
+         SarosRagdollFix.LOG.warn("[ragdoll-fix] citadel setupAnim failed for {}, using default pose", dummy.getType(), t);
+         resetPose(parts); // it may have thrown halfway through
+      }
+
+      int tw = intField(model, "texWidth", 64);
+      int th = intField(model, "texHeight", 32);
+
+      Set<Object> isChild = Collections.newSetFromMap(new IdentityHashMap<>());
+      for (Object p : parts) {
+         for (Object c : children(p)) {
+            isChild.add(c);
+         }
+      }
+
+      int[] shown = new int[1];
+      int[] total = new int[1];
+      MeshDefinition mesh = buildMesh(parts, isChild, tw, th, true, shown);
+      buildMesh(parts, isChild, tw, th, false, total);
+
+      // If most of the model is flagged hidden, the model was caught in a odd state (the ragdoll is a standing
+      // mob, so almost everything should be visible). Ignore the flags rather than lose limbs.
+      if (total[0] > 0 && shown[0] < total[0] * 0.6) {
+         SarosRagdollFix.LOG.warn("[ragdoll-fix] citadel model {} had {} of {} cubes hidden, ignoring showModel",
+            model.getClass().getSimpleName(), total[0] - shown[0], total[0]);
+         mesh = buildMesh(parts, isChild, tw, th, false, shown);
+      }
+
+      if (shown[0] == 0) {
+         return null;
+      }
+
+      return new GeoSyntheticModel(LayerDefinition.create(mesh, tw, th).bakeRoot());
+   } catch (Throwable t) {
+      SarosRagdollFix.LOG.debug("[ragdoll-fix] could not convert citadel model", t);
+      return null;
+   }
+}
+
+private static MeshDefinition buildMesh(List<Object> parts, Set<Object> isChild, int tw, int th, boolean respectHidden, int[] cubeCount) throws Exception {
+   cubeCount[0] = 0;
+   MeshDefinition mesh = new MeshDefinition();
+   PartDefinition rootDef = mesh.getRoot();
+   int i = 0;
+   for (Object p : parts) {
+      if (!isChild.contains(p)) {
+         add(rootDef, p, "p" + i++, tw, th, cubeCount, 0, respectHidden);
+      }
+   }
+
+   return mesh;
+}
+
+// Citadel's own reset (rotation point, angles, offsets back to the pose the model was built with)
+private static void resetPose(List<Object> parts) {
+   for (Object p : parts) {
+      try {
+         p.getClass().getMethod("resetToDefaultPose").invoke(p);
+      } catch (Throwable ignored) {
+      }
+   }
+}
+
+private static void add(PartDefinition parent, Object box, String name, int tw, int th, int[] cubeCount, int depth, boolean respectHidden) throws Exception {
+   if (depth > 64) {
+      return;
+   }
+
+   // A hidden part keeps its place in the tree (pivot and children) but gets no cubes. Skipping it outright
+   // took every limb below it along.
+   boolean hidden = respectHidden && !bool(box, "showModel", true);
+
+   CubeListBuilder builder = CubeListBuilder.create();
+   if (!hidden) {
       boolean mirror = bool(box, "mirror", false);
       Object list = field(box, "cubeList");
       if (list instanceof List<?> cubeList) {
@@ -113,21 +139,22 @@ public final class CitadelModelConverter {
             cubeCount[0]++;
          }
       }
-
-      PartDefinition def = parent.addOrReplaceChild(
-         name,
-         builder,
-         PartPose.offsetAndRotation(
-            num(box, "rotationPointX"), num(box, "rotationPointY"), num(box, "rotationPointZ"),
-            num(box, "rotateAngleX"), num(box, "rotateAngleY"), num(box, "rotateAngleZ")
-         )
-      );
-
-      int i = 0;
-      for (Object child : children(box)) {
-         add(def, child, name + "_" + i++, tw, th, cubeCount, depth + 1);
-      }
    }
+
+   PartDefinition def = parent.addOrReplaceChild(
+      name,
+      builder,
+      PartPose.offsetAndRotation(
+         num(box, "rotationPointX"), num(box, "rotationPointY"), num(box, "rotationPointZ"),
+         num(box, "rotateAngleX"), num(box, "rotateAngleY"), num(box, "rotateAngleZ")
+      )
+   );
+
+   int i = 0;
+   for (Object child : children(box)) {
+      add(def, child, name + "_" + i++, tw, th, cubeCount, depth + 1, respectHidden);
+   }
+}
 
    // Position and size are posX1..posZ2. Texture origin and inflate are worked out from the quads.
    private static void addCube(CubeListBuilder builder, Object cube, boolean mirror, int tw, int th) throws Exception {
