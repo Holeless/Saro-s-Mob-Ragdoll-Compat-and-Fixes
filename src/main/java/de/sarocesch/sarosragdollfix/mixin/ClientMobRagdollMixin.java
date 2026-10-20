@@ -6,6 +6,7 @@ import de.sarocesch.sarosmobragdoll.client.ClientMobRagdoll;
 import de.sarocesch.sarosmobragdoll.client.skeleton.Bone;
 import de.sarocesch.sarosmobragdoll.client.skeleton.MobSkeleton;
 import de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonLayer;
+import de.sarocesch.sarosragdollfix.LayerSafeBuffers;
 import de.sarocesch.sarosragdollfix.RigidDummies;
 import de.sarocesch.sarosragdollfix.TintedConsumer;
 import de.sarocesch.sarosragdollfix.WoundCompat;
@@ -22,6 +23,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -34,6 +36,18 @@ public abstract class ClientMobRagdollMixin {
    @Shadow
    private static void renderPartCubesOnly(ModelPart part, PoseStack pose, VertexConsumer consumer, int light, float alpha, Set<ModelPart> boneParts) {
       throw new AssertionError();
+   }
+
+   // The original keeps one base VertexConsumer for the whole bone loop, and drawing a bone's layers (glowing eyes...)
+   // ends that batch, so every bone after the first vanished. See LayerSafeBuffers.
+   @ModifyVariable(method = "render", at = @At("HEAD"), argsOnly = true)
+   private MultiBufferSource saros_fix$layerSafeBuffers(MultiBufferSource buffers) {
+      MobSkeleton s = this.skeleton;
+      if (s == null || s.rigid || s.layers == null || s.layers.isEmpty()) {
+         return buffers;
+      }
+
+      return new LayerSafeBuffers(buffers);
    }
 
    // rigid ragdolls: draw from their own copy of the mob
