@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.sarocesch.sarosragdollfix.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "saros_ragdoll_fix.refmap.json",
+  "mixins": [],
+  "client": [
+    "BoneRagdollPhysicsMixin",
+    "ClientMobRagdollAccessor",
+    "ClientMobRagdollMixin",
+    "ClientRagdollManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

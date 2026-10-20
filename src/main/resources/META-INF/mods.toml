@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+issueTrackerURL="${mod_issues_url}"
+# The ragdolls are simulated and drawn on the client only, so this addon is client only too.
+clientSideOnly=true
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="${mod_authors}"
+description='''Fixes and compatibility for Saro's Mob Ragdoll on 1.20.1: less fling, no stiff corpses, and ragdolls for Alex's Mobs and Naturalist mobs (no more frozen duplicate).'''
+
+[[dependencies.${mod_id}]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,1.21)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="saros_mob_ragdoll"
+    mandatory=true
+    versionRange="[1.0.1,1.1)"
+    ordering="AFTER"
+    side="CLIENT"
