@@ -31,6 +31,11 @@ public final class FixConfig {
    public static final ForgeConfigSpec.BooleanValue CONVERT_CITADEL;
    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> GEO_HIDDEN_BONES;
 
+   public static final ForgeConfigSpec.BooleanValue COPY_DAMAGE_STATE;
+   public static final ForgeConfigSpec.BooleanValue COPY_WOUNDS;
+   public static final ForgeConfigSpec.BooleanValue FIX_MODEL_SCALE;
+   public static final ForgeConfigSpec.BooleanValue DEDUPE_SPAWNS;
+
    static {
       ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
@@ -86,12 +91,33 @@ public final class FixConfig {
          .defineListAllowEmpty("forceRigid", List.of("alexsmobs", "naturalist"), o -> o instanceof String);
       OWN_RENDER_DUMMY = b.comment(
             "Draw each ragdoll from its own copy of the mob that carries the dead mob's variant/colour/profession (and, for rigid",
-            "ragdolls, is turned the right way round). false = the original mod's shared default-variant copy.")
+            "ragdolls, is turned the right way round). false = the original mod's shared default-variant copy.",
+            "Also needed for copyDamageState below.")
          .define("perRagdollModel", true);
       REMOVE_ORIGINAL_FOR_RIGID = b.comment(
             "Remove the dying mob from the client world the moment a rigid or converted GeckoLib ragdoll replaces it. Needed",
             "because GeckoLib and Citadel renderers do not always honour the original mod's hide trick (frozen duplicate).")
          .define("removeOriginal", true);
+      b.pop();
+
+      b.comment("Make the ragdoll a copy of the mob as it was before it died, and fix a few things that made it differ.")
+         .push("fidelity");
+      COPY_DAMAGE_STATE = b.comment(
+            "Copy the state the mob had while alive: its health from before it died (iron golem cracks), its equipment, and any",
+            "overlay that only shows in that state. false = every ragdoll looks like a fresh default mob.")
+         .define("copyDamageState", true);
+      COPY_WOUNDS = b.comment(
+            "Keep the wounds / bullet holes drawn on the mob by Better Blood Overlay (for example from TaCZ guns) when it becomes",
+            "a ragdoll. Does nothing if that mod is not installed.")
+         .define("copyBloodWounds", true);
+      FIX_MODEL_SCALE = b.comment(
+            "Fix models that scale themselves when drawn and so came out the wrong size as a ragdoll. Currently: adult rabbits",
+            "(they were 1.67 times too big).")
+         .define("fixModelScale", true);
+      DEDUPE_SPAWNS = b.comment(
+            "Ignore a second ragdoll spawn for the same mob (same entity id, or same kind of mob on the exact same spot in the",
+            "same tick). Stops some GeckoLib mobs from appearing twice. Each ignored spawn is logged as [ragdoll-fix].")
+         .define("dedupeSpawns", true);
       b.pop();
 
       SPEC = b.build();

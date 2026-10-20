@@ -9,8 +9,12 @@ import de.sarocesch.sarosmobragdoll.ragdoll.physics.BoneRagdollPhysics;
 import de.sarocesch.sarosragdollfix.DummyFactory;
 import de.sarocesch.sarosragdollfix.FixConfig;
 import de.sarocesch.sarosragdollfix.GeoSkeletons;
+import de.sarocesch.sarosragdollfix.ModelScaleFix;
+import de.sarocesch.sarosragdollfix.RagdollCleanup;
 import de.sarocesch.sarosragdollfix.RagdollLaunch;
 import de.sarocesch.sarosragdollfix.RigidDummies;
+import de.sarocesch.sarosragdollfix.SarosRagdollFix;
+import de.sarocesch.sarosragdollfix.WoundCompat;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.client.Minecraft;
@@ -41,12 +45,36 @@ public abstract class ClientRagdollManagerMixin {
    @Unique
    private EntityType<?> saros_fix$type;
 
-   @Inject(method = "spawn", at = @At("HEAD"))
+   /** Wounds frozen at the start of spawn(), while the mob is still in the world. */
+   @Unique
+   private List<WoundCompat.Wound> saros_fix$wounds;
+
+   @Inject(method = "spawn", at = @At("HEAD"), cancellable = true)
    private void saros_fix$spawnHead(
       EntityType<?> type, int entityId, double x, double y, double z, float bodyYaw, float vx, float vy, float vz, boolean baby, int lifeTicks, CallbackInfo ci
    ) {
+      this.saros_fix$wounds = null;
       this.saros_fix$type = type;
       this.saros_fix$sizeBefore = this.ragdolls.size();
+
+      ClientLevel level = Minecraft.getInstance().level;
+      if (level == null) {
+         return;
+      }
+
+      if (FixConfig.DEDUPE_SPAWNS.get() && RagdollCleanup.isDuplicate(type, entityId, x, y, z, level.getGameTime())) {
+         SarosRagdollFix.LOG.info("[ragdoll-fix] ignored a duplicate ragdoll spawn for {} (entity id {})", type, entityId);
+         ci.cancel();
+         return;
+      }
+
+      // Must happen here: once the original is removed (below, or by the game) Better Blood Overlay deletes its wounds.
+      if (FixConfig.COPY_WOUNDS.get() && entityId >= 0) {
+         Entity live = level.getEntity(entityId);
+         if (live != null) {
+            this.saros_fix$wounds = WoundCompat.capture(live, level.getGameTime());
+         }
+      }
    }
 
    @Redirect(
@@ -70,31 +98,46 @@ public abstract class ClientRagdollManagerMixin {
       )
    )
    private MobSkeleton saros_fix$skipGuessedSkeleton(VanillaModelSkeletonProvider provider, EntityType<?> type, ClientLevel level, boolean baby) {
-      if (FixConfig.CONVERT_GEO.get() || FixConfig.CONVERT_CITADEL.get()) {
-         // GeckoLib mobs: convert the .geo.json so they get limbs. Null = not convertible, use the old behaviour.
-         MobSkeleton converted = GeoSkeletons.tryBuild(provider, type, level, baby);
-         if (converted != null) {
-            return converted;
+      ModelScaleFix.begin(type, baby);
+      try {
+         if (FixConfig.CONVERT_GEO.get() || FixConfig.CONVERT_CITADEL.get()) {
+            // GeckoLib mobs: convert the .geo.json so they get limbs. Null = not convertible, use the old behaviour.
+            MobSkeleton converted = GeoSkeletons.tryBuild(provider, type, level, baby);
+            if (converted != null) {
+               return converted;
+            }
          }
-      }
 
-      return FixConfig.isForcedRigid(type) ? null : provider.build(type, level, baby);
+         return FixConfig.isForcedRigid(type) ? null : provider.build(type, level, baby);
+      } finally {
+         ModelScaleFix.end();
+      }
    }
 
    /**
     * After a ragdoll was added. Rigid: give it its own render copy and remove the original entity. Normal (ModelPart):
-    * remember this mob's own texture so the variant (white rabbit etc.) is kept.
+    * remember this mob's own texture, overlays and wounds so the variant, damage and bullet holes are kept.
     */
    @Inject(method = "spawn", at = @At("RETURN"))
    private void saros_fix$spawnTail(
       EntityType<?> type, int entityId, double x, double y, double z, float bodyYaw, float vx, float vy, float vz, boolean baby, int lifeTicks, CallbackInfo ci
    ) {
+      List<WoundCompat.Wound> wounds = this.saros_fix$wounds;
+      this.saros_fix$wounds = null;
+
       if (this.ragdolls.size() <= this.saros_fix$sizeBefore) {
+         WoundCompat.releaseAll(wounds);
          return;
       }
 
       ClientMobRagdoll rag = this.ragdolls.get(this.ragdolls.size() - 1);
       MobSkeleton skeleton = ((ClientMobRagdollAccessor)(Object)rag).saros_fix$getSkeleton();
+      if (skeleton == null || skeleton.rigid) {
+         WoundCompat.releaseAll(wounds);
+      } else if (wounds != null && !wounds.isEmpty()) {
+         RigidDummies.putWounds(rag, wounds);
+      }
+
       if (skeleton == null) {
          return;
       }
@@ -108,9 +151,8 @@ public abstract class ClientRagdollManagerMixin {
          }
 
          // Converted GeckoLib mobs: their renderer ignores the original mod's hide trick, so remove the original.
-         if (level != null && live != null && GeoSkeletons.isConverted(skeleton) && FixConfig.REMOVE_ORIGINAL_FOR_RIGID.get()) {
-            live.setInvisible(true);
-            level.removeEntity(entityId, Entity.RemovalReason.DISCARDED);
+         if (GeoSkeletons.isConverted(skeleton) && FixConfig.REMOVE_ORIGINAL_FOR_RIGID.get()) {
+            RagdollCleanup.discard(level, entityId, live);
          }
          return;
       }
@@ -122,9 +164,8 @@ public abstract class ClientRagdollManagerMixin {
          }
       }
 
-      if (level != null && live != null && FixConfig.REMOVE_ORIGINAL_FOR_RIGID.get()) {
-         live.setInvisible(true);
-         level.removeEntity(entityId, Entity.RemovalReason.DISCARDED);
+      if (FixConfig.REMOVE_ORIGINAL_FOR_RIGID.get()) {
+         RagdollCleanup.discard(level, entityId, live);
       }
    }
 }
