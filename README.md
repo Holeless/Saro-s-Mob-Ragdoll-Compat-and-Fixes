@@ -10,7 +10,7 @@ Tested against Saro's Mob Ragdoll **1.0.1** (the dependency range is `[1.0.1,1.1
 | Problem | Cause in the original | Fix |
 |---|---|---|
 | Mobs fly too far when they die | Death launch is hardcoded: 6 blocks/s away from the attacker, +2 up, for every mob | Configurable, scaled by mob size, capped (defaults: about a third of the horizontal speed, half the vertical) |
-| Mob is **stiff** before it ragdolls | Every body part gets the *same* velocity, so no joint flexes and the corpse flies upright like a plank. Joints are also locked to about 40 degrees, and a body with no push stands on its legs for seconds | Torso leads, limbs trail at 60%, the body is spun so it tips over, tip-over in a random direction if nothing pushed it, joint limit 75 degrees |
+| Mob is **stiff** before it ragdolls | Every body part gets the *same* velocity, so no joint flexes and the corpse flies upright like a plank. Joints are also locked to about 40 degrees, and a body with no push stands on its legs for seconds | Torso leads, limbs trail at 20%, the body is spun so it tips over, tip-over in a random direction if nothing pushed it, joint limit 75 degrees |
 | Alex's Mobs / Naturalist mobs: **frozen duplicate** that never ragdolls | Their models are not vanilla `ModelPart` trees, so the original falls back to one rigid box. That box was launched upright and, with no push, **never moved at all**. The original mob was only hidden with `setInvisible` + `RenderLivingEvent`, which GeckoLib renderers (Naturalist) never fire and Citadel renderers (Alex's Mobs) can ignore | The box now topples. It is drawn with the mob's own renderer from a per-ragdoll copy that has the dead mob's variant/colour and faces the right way (the original's shared copy faced backwards). The original entity is removed from the client world |
 
 The ragdolls are simulated client side, so this is a **client-only** mod. Put it in the client's `mods` folder; servers do not need it.
@@ -28,7 +28,7 @@ The ragdolls are simulated client side, so this is a **client-only** mod. Put it
 | launch | horizontalScale / verticalScale | 0.35 / 0.5 | multipliers on what the original computed (original = 1.0) |
 | launch | maxLaunchSpeed | 5.0 | blocks/s cap |
 | launch | scaleBySize | true | big mobs pushed less |
-| launch | limbVelocityFactor | 0.6 | limb speed relative to torso (1.0 = original, stiff) |
+| launch | limbVelocityFactor | 0.2 | limb speed relative to torso (1.0 = original, stiff) |
 | launch | spinOnKill | 2.5 | topple rate, rad/s |
 | launch | randomToppleWhenNotPushed, notPushedBelow, notPushedSpeed | true, 0.8, 0.8 | tip over randomly when no attacker pushed it |
 | joints | enabled, jointLimitDegrees | true, 75 | original is about 40 |
@@ -44,6 +44,10 @@ Requires JDK 17. Saro's Mob Ragdoll is "All Rights Reserved", so it is not in th
 2. `gradle wrapper --gradle-version 8.8` once (or open the folder in IntelliJ and let it import), then `./gradlew build`.
 3. The jar is `build/libs/saros_ragdoll_fix-forge-1.20.1-1.0.0.jar`.
 
+### GitHub Actions
+
+`.github/workflows/build.yml` builds the jar on every push and uploads it as an artifact (Actions tab > the run > Artifacts). Pushing a tag like `v1.0.0` also attaches it to a GitHub release. Because the Saro jar cannot be committed to a public repo, add a repository secret **`SARO_JAR_URL`** (Settings > Secrets and variables > Actions) holding a direct download link to the 1.20.1 jar, or use a private repo and `git add -f libs/<jar>`.
+
 To try it quickly, drop both jars into a 1.20.1 Forge instance's `mods` folder (a production run; the original is not deobfuscated, so `runClient` in the dev environment needs extra setup).
 
 Before publishing, set `mod_issues_url` and `mod_authors` in `gradle.properties`, and the copyright line in `LICENSE`.
@@ -54,12 +58,14 @@ Before publishing, set `mod_issues_url` and `mod_authors` in `gradle.properties`
 
 | | OLD travel | OLD tilt at 0.25s / 1s | NEW travel | NEW tilt at 0.25s / 1s |
 |---|---|---|---|---|
-| player-sized humanoid, hit | 7.6 blocks | 0 / 84 deg | 2.1 | 44 / 103 deg |
+| player-sized humanoid, hit | 7.6 blocks | 0 / 84 deg | 2.1 | 63 / 119 deg |
 | rigid 0.6x1.8 box (Alex's / Naturalist), hit | 5.3 | 0 / 88 | 1.2 | 49 / 90 |
 | rigid box, **no attacker** | 0.0 | **0 / 0 (never falls)** | 1.2 | 22 / 90 |
 | rigid 3.5x4 box (elephant-like), hit | 5.2 | **0 / 0 (never falls)** | 2.8 | 24 / 77 |
 
 The OLD rigid box standing forever is the "stiff, not moving" model.
+
+**Planking:** for multi-part mobs (humanoids, animals with vanilla models) limbs now flop right away: in the first 0.5 s the largest limb-to-torso bend is about 110 degrees, against 13 degrees originally. Mobs on the rigid path (Alex's Mobs, Naturalist) are a single physics body, so they tumble and land as one piece; they cannot flop limb by limb.
 
 **Not verified** (no Forge/Minecraft was available where this was written, so it was never built with ForgeGradle or run in game):
 

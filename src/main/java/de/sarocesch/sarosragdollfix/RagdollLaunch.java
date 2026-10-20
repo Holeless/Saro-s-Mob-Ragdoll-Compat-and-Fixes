@@ -33,7 +33,7 @@ public final class RagdollLaunch {
       /** Big mobs are pushed less than a player-sized mob, never more. */
       public boolean scaleBySize = true;
       /** Fraction of the launch speed given to every part except the heaviest one (the torso/body). */
-      public double limbVelocityFactor = 0.6;
+      public double limbVelocityFactor = 0.2;
       /** Topple rate in rad/s about the body's centre of mass. 0 disables. */
       public double spinOnKill = 2.5;
       /** Tip over in a random direction when almost nothing pushed the body. */

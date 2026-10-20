@@ -43,7 +43,7 @@ public final class FixConfig {
       LIMB_VELOCITY_FACTOR = b.comment(
             "Fraction of the launch speed given to every part except the body/torso. 1.0 = everything moves as one stiff piece",
             "(original behaviour). Lower = limbs trail behind and the corpse goes limp sooner.")
-         .defineInRange("limbVelocityFactor", 0.6, 0.0, 1.0);
+         .defineInRange("limbVelocityFactor", 0.2, 0.0, 1.0);
       SPIN_ON_KILL = b.comment("Topple rate (rad/s) so the body tips over instead of staying upright. 0 = off.").defineInRange("spinOnKill", 2.5, 0.0, 10.0);
       RANDOM_TOPPLE = b.comment("Tip over in a random direction when almost nothing pushed the body (fall, fire, poison ...).")
          .define("randomToppleWhenNotPushed", true);
