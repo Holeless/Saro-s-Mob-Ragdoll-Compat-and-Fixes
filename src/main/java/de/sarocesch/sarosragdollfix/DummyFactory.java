@@ -85,39 +85,23 @@ public final class DummyFactory {
       }
    }
 
-   // Villager type / profession / level. Taken from the live mob, but if that is gone or already shows no profession,
-   // fall back to what VillagerTracker saw while it was alive. Set explicitly so it doesn't depend on the data copy.
+   // A dying villager can already be reset or gone on the client, so fall back to what VillagerTracker saw while it lived.
    private static void applyVillagerData(Entity d, @Nullable Entity live, int entityId) {
       if (!(d instanceof VillagerDataHolder target)) {
          return;
       }
 
-      try {
-         VillagerData best = null;
-         String source = "none";
-         if (live instanceof VillagerDataHolder src) {
-            best = src.getVillagerData();
-            source = "live";
+      VillagerData data = live instanceof VillagerDataHolder src ? src.getVillagerData() : null;
+      if (data == null || data.getProfession() == VillagerProfession.NONE) {
+         VillagerData seen = entityId >= 0 ? VillagerTracker.last(entityId) : null;
+         if (seen != null && (data == null || seen.getProfession() != VillagerProfession.NONE)) {
+            data = seen;
          }
+      }
 
-         if (best == null || best.getProfession() == VillagerProfession.NONE) {
-            VillagerData tracked = entityId >= 0 ? VillagerTracker.last(entityId) : null;
-            if (tracked != null && (best == null || tracked.getProfession() != VillagerProfession.NONE)) {
-               best = tracked;
-               source = "tracker";
-            }
-         }
-
-         if (best != null) {
-            target.setVillagerData(best);
-         }
-
-         SarosRagdollFix.LOG.info(
-            "[ragdoll-fix] villager look for entity {}: profession {} level {} (from {})",
-            entityId, best == null ? "?" : best.getProfession(), best == null ? 0 : best.getLevel(), source
-         );
-      } catch (Throwable t) {
-         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not set villager data", t);
+      if (data != null) {
+         target.setVillagerData(data);
+         SarosRagdollFix.LOG.debug("[ragdoll-fix] villager {} -> {} level {}", entityId, data.getProfession(), data.getLevel());
       }
    }
 

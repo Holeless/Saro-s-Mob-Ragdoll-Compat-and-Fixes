@@ -9,9 +9,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.npc.VillagerData;
 import net.minecraft.world.entity.npc.VillagerDataHolder;
 
-// Last villager data (type, profession, level) seen while the villager was alive. The ragdoll spawns when the mob is
-// already dying, and by then the live entity can be gone or its data reset, which gave profession villagers a plain
-// ragdoll. Same idea as HealthTracker.
+// Last villager data seen while alive. By the time the ragdoll spawns the live entity can be gone or reset,
+// which left profession villagers looking plain.
 public final class VillagerTracker {
    private static final int KEEP_TICKS = 400;
    private static final Map<Integer, Entry> LAST = new HashMap<>();

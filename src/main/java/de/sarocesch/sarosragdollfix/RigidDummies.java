@@ -88,46 +88,33 @@ public final class RigidDummies {
       WoundCompat.releaseAll(w);
    }
 
-   // Adds to the ragdoll's overlay list (never replaces it, so villager clothes and golem cracks can both be there).
+   // Adds to the overlay list instead of replacing it, so villager clothes and golem cracks can both be there.
    private static void mergeExtras(ClientMobRagdoll ragdoll, List<RenderType> add) {
       if (add.isEmpty()) {
          return;
       }
 
-      synchronized (EXTRA_TYPES) {
-         List<RenderType> old = EXTRA_TYPES.get(ragdoll);
-         List<RenderType> merged = old == null ? new ArrayList<>() : new ArrayList<>(old);
-         for (RenderType rt : add) {
-            if (!merged.contains(rt)) {
-               merged.add(rt);
-            }
+      List<RenderType> list = EXTRA_TYPES.computeIfAbsent(ragdoll, k -> new ArrayList<>());
+      for (RenderType rt : add) {
+         if (!list.contains(rt)) {
+            list.add(rt);
          }
-
-         EXTRA_TYPES.put(ragdoll, merged);
       }
    }
 
    // Normal ragdolls: ask the mob's renderer which texture and layers this mob uses. The original caches one per type.
    @SuppressWarnings({"unchecked", "rawtypes"})
    public static void captureLook(ClientMobRagdoll ragdoll, MobSkeleton skeleton, EntityType<?> type, ClientLevel level, @Nullable Entity live, @Nullable Entity prebuilt, boolean baby) {
-      Entity dummy;
-      try {
-         dummy = prebuilt != null ? prebuilt : DummyFactory.create(type, level, live, baby);
-      } catch (Throwable t) {
-         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve look for {}", type, t);
-         return;
-      }
-
+      Entity dummy = prebuilt != null ? prebuilt : DummyFactory.create(type, level, live, baby);
       if (dummy == null) {
          return;
       }
 
-      // first and on its own: reads the villager's data directly, so it doesn't depend on the renderer or on what
-      // the layer probe found, and a failure further down can't skip it
+      // done first and separately so a failure in the renderer lookups below can't skip it
       try {
          addVillagerClothes(ragdoll, dummy);
       } catch (Throwable t) {
-         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not add villager clothes for {}", type, t);
+         SarosRagdollFix.LOG.debug("[ragdoll-fix] villager clothes failed for {}", type, t);
       }
 
       if (skeleton.renderer == null) {
@@ -139,11 +126,7 @@ public final class RigidDummies {
          if (tex != null) {
             TEXTURES.put(ragdoll, tex);
          }
-      } catch (Throwable t) {
-         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve texture for {}", type, t);
-      }
 
-      try {
          captureLayers(ragdoll, skeleton, dummy);
          if (FixConfig.COPY_DAMAGE_STATE.get()) {
             captureExtras(ragdoll, skeleton, dummy);
@@ -153,9 +136,8 @@ public final class RigidDummies {
       }
    }
 
-   // Villager clothes (profession texture and level badge) read straight from the villager's data, same textures and
-   // order as vanilla's VillagerProfessionLayer. Doesn't depend on what Saro's layer probe found.
-   // Zombie villagers use other textures and are left to the layer capture.
+   // Profession texture and level badge, read straight from the villager's data (same as vanilla's
+   // VillagerProfessionLayer). Zombie villagers use other textures, the layer capture handles those.
    private static void addVillagerClothes(ClientMobRagdoll ragdoll, Entity dummy) {
       if (dummy instanceof ZombieVillager || !(dummy instanceof VillagerDataHolder holder) || !(dummy instanceof LivingEntity living) || living.isBaby()) {
          return;
@@ -185,8 +167,6 @@ public final class RigidDummies {
          if (!out.contains(type)) {
             out.add(type);
          }
-      } else {
-         SarosRagdollFix.LOG.debug("[ragdoll-fix] texture {} not found", texture);
       }
    }
 

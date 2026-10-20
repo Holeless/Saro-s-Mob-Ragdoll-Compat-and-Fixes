@@ -1,75 +1,64 @@
 # Saro's Mob Ragdoll Fix
 
-A small **client-side addon for [Saro's Mob Ragdoll](https://www.curseforge.com/minecraft/mc-mods/saros-mob-ragdoll)** on **Minecraft 1.20.1 / Forge 47.x**.
-It does not replace the original mod; it patches it at load time with mixins. Both jars are needed.
+A client-side addon for [Saro's Mob Ragdoll](https://www.curseforge.com/minecraft/mc-mods/saros-mob-ragdoll) on Minecraft 1.20.1 / Forge 47. It patches the original with mixins, so you need both jars. Servers don't need it.
 
-Tested against Saro's Mob Ragdoll **1.0.1** (the dependency range is `[1.0.1,1.1)`).
+Built and tested against Saro's Mob Ragdoll 1.0.1 (the dependency range is `[1.0.1,1.1)`).
 
-## What it fixes
+## What it changes
 
-| Problem | Cause in the original | Fix |
-|---|---|---|
-| Mobs fly too far when they die | Death launch is hardcoded: 6 blocks/s away from the attacker, +2 up, for every mob | Configurable, scaled by mob size, capped (defaults: about a third of the horizontal speed, half the vertical) |
-| Mob is **stiff** before it ragdolls | Every body part gets the *same* velocity, so no joint flexes and the corpse flies upright like a plank. Joints are also locked to about 40 degrees, and a body with no push stands on its legs for seconds | Torso leads, limbs trail at 20%, the body is spun so it tips over, tip-over in a random direction if nothing pushed it, joint limit 75 degrees |
-| Alex's Mobs / Naturalist mobs: **frozen duplicate** that never ragdolls | Their models are not vanilla `ModelPart` trees, so the original falls back to one rigid box. That box was launched upright and, with no push, **never moved at all**. The original mob was only hidden with `setInvisible` + `RenderLivingEvent`, which GeckoLib renderers (Naturalist) never fire and Citadel renderers (Alex's Mobs) can ignore | The box now topples. It is drawn with the mob's own renderer from a per-ragdoll copy that has the dead mob's variant/colour and faces the right way (the original's shared copy faced backwards). The original entity is removed from the client world |
-
-The ragdolls are simulated client side, so this is a **client-only** mod. Put it in the client's `mods` folder; servers do not need it.
+- **Launch.** The original throws every mob 6 blocks/s away from the attacker and 2 up, at the same speed on every body part. Corpses fly far and stay stiff. Now the torso leads, limbs trail behind, the body is spun so it tips over, and the push is scaled down and capped. Mobs nobody pushed (fall damage, fire) fall in a random direction.
+- **Joints.** The original locks every joint to about 40 degrees. The default here is 75.
+- **GeckoLib and Citadel mobs** (Alex's Mobs, Naturalist). Their models aren't vanilla `ModelPart` trees, so the original used one rigid box that sometimes never moved and left a frozen copy of the mob behind. Where possible the model is now converted into a real multi-bone skeleton. Otherwise the box topples, is drawn from its own copy of the mob, and the original entity is removed.
+- **Looks.** Each ragdoll is drawn from a copy of the dead mob instead of one shared default per type: variant, colour, iron golem cracks, equipment, villager profession and level badge, Better Blood Overlay wounds. Adult rabbits are no longer 1.67x too big.
+- **Duplicates.** Repeat spawns for the same mob are ignored.
+- **Beds.** Mobs that die in bed stay lying in it.
 
 ## Install
 
-1. Saro's Mob Ragdoll 1.20.1 (1.0.1) and this jar in `mods/`.
-2. Config is created on first launch: `config/saros_ragdoll_fix-client.toml`.
+Put Saro's Mob Ragdoll 1.0.1 and this jar in `mods/`. The config is created on first launch at `config/saros_ragdoll_fix-client.toml`; every option has a comment in the file.
 
-## Config (`saros_ragdoll_fix-client.toml`)
+The main ones:
 
-| Section | Key | Default | Meaning |
-|---|---|---|---|
-| launch | enabled | true | false = original launch |
-| launch | horizontalScale / verticalScale | 0.35 / 0.5 | multipliers on what the original computed (original = 1.0) |
-| launch | maxLaunchSpeed | 5.0 | blocks/s cap |
-| launch | scaleBySize | true | big mobs pushed less |
-| launch | limbVelocityFactor | 0.2 | limb speed relative to torso (1.0 = original, stiff) |
-| launch | spinOnKill | 2.5 | topple rate, rad/s |
-| launch | randomToppleWhenNotPushed, notPushedBelow, notPushedSpeed | true, 0.8, 0.8 | tip over randomly when no attacker pushed it |
-| joints | enabled, jointLimitDegrees | true, 75 | original is about 40 |
-| compat | forceRigid | ["alexsmobs","naturalist"] | namespaces or entity ids that always use the real-renderer path. Add any other mod whose mobs look wrong |
-| compat | perRagdollModel | true | per-ragdoll copy: right variant, right facing |
-| compat | removeOriginal | true | remove the original mob when a rigid ragdoll takes over |
+| Section | Key | Default |
+|---|---|---|
+| launch | `enabled`, `horizontalScale`, `verticalScale`, `maxLaunchSpeed` | true, 0.35, 0.5, 5.0 |
+| launch | `limbVelocityFactor`, `spinOnKill` | 0.2, 2.5 |
+| joints | `enabled`, `jointLimitDegrees` | true, 75 |
+| compat | `convertGeoModels`, `convertCitadelModels` | true |
+| compat | `forceRigid` | `["alexsmobs","naturalist"]` (ignored for mobs that convert fine) |
+| compat | `perRagdollModel`, `removeOriginal` | true |
+| fidelity | `copyDamageState`, `copyBloodWounds`, `fixModelScale`, `dedupeSpawns` | true |
+| sleeping | `layDownSleepers`, `sleepFaceDown` | true, false |
+
+If a mod's mobs look wrong, try adding its namespace to `forceRigid`.
 
 ## Building
 
-Requires JDK 17. Saro's Mob Ragdoll is "All Rights Reserved", so it is not in this repo.
+JDK 17. Saro's mod is All Rights Reserved so it isn't in this repo: copy the 1.20.1 jar into `libs/` (see `libs/README.md`), run `gradle wrapper --gradle-version 8.8` once, then `./gradlew build`. The jar ends up in `build/libs/`.
 
-1. Copy the 1.20.1 jar into `libs/` (see `libs/README.md`).
-2. `gradle wrapper --gradle-version 8.8` once (or open the folder in IntelliJ and let it import), then `./gradlew build`.
-3. The jar is `build/libs/saros_ragdoll_fix-forge-1.20.1-1.0.0.jar`.
+`.github/workflows/main.yml` builds on every push and attaches the jar to a release when you push a `v*` tag. It needs a repository secret `SARO_JAR_URL` with a direct link to the Saro jar (or a private repo with the jar force-added to `libs/`).
 
-### GitHub Actions
+`runClient` in the dev environment needs extra setup because the original isn't deobfuscated. The easy way to try a build is to drop both jars into a normal 1.20.1 Forge instance.
 
-`.github/workflows/build.yml` builds the jar on every push and uploads it as an artifact (Actions tab > the run > Artifacts). Pushing a tag like `v1.0.0` also attaches it to a GitHub release. Because the Saro jar cannot be committed to a public repo, add a repository secret **`SARO_JAR_URL`** (Settings > Secrets and variables > Actions) holding a direct download link to the 1.20.1 jar, or use a private repo and `git add -f libs/<jar>`.
+Before publishing, change `mod_issues_url` and `mod_authors` in `gradle.properties` and the copyright line in `LICENSE`.
 
-To try it quickly, drop both jars into a 1.20.1 Forge instance's `mods` folder (a production run; the original is not deobfuscated, so `runClient` in the dev environment needs extra setup).
+## Tests
 
-Before publishing, set `mod_issues_url` and `mod_authors` in `gradle.properties`, and the copyright line in `LICENSE`.
+`./test-harness/run.sh` (Saro jar in `libs/`, JDK 17+) runs the real `BoneRagdollPhysics` and its Bullet native headless on a flat floor, with and without the addon's launch and joint limits. Results from the first run (travel after 10 s, torso tilt from vertical):
 
-## Verification, and what is not verified
-
-**Verified** (`test-harness/`, run with `./test-harness/run.sh` once the Saro jar is in `libs/`): the real `BoneRagdollPhysics` class from the 1.20.1 jar, with its Bullet native, simulated headless on a floor with and without this addon's launch and joint limits. Tilt is the torso angle from vertical; travel is horizontal distance after 10 s.
-
-| | OLD travel | OLD tilt at 0.25s / 1s | NEW travel | NEW tilt at 0.25s / 1s |
+| Case | Old travel | Old tilt at 0.25 s / 1 s | New travel | New tilt at 0.25 s / 1 s |
 |---|---|---|---|---|
-| player-sized humanoid, hit | 7.6 blocks | 0 / 84 deg | 2.1 | 63 / 119 deg |
-| rigid 0.6x1.8 box (Alex's / Naturalist), hit | 5.3 | 0 / 88 | 1.2 | 49 / 90 |
-| rigid box, **no attacker** | 0.0 | **0 / 0 (never falls)** | 1.2 | 22 / 90 |
-| rigid 3.5x4 box (elephant-like), hit | 5.2 | **0 / 0 (never falls)** | 2.8 | 24 / 77 |
+| humanoid, hit | 7.6 | 0 / 84 | 2.1 | 63 / 119 |
+| rigid 0.6x1.8 box, hit | 5.3 | 0 / 88 | 1.2 | 49 / 90 |
+| rigid box, no attacker | 0.0 | 0 / 0 (never falls) | 1.2 | 22 / 90 |
+| rigid 3.5x4 box, hit | 5.2 | 0 / 0 (never falls) | 2.8 | 24 / 77 |
 
-The OLD rigid box standing forever is the "stiff, not moving" model.
+Limbs on multi-part mobs now bend about 110 degrees in the first half second, against 13 originally. Mobs that stay on the rigid path are a single body and tumble as one piece.
 
-**Planking:** for multi-part mobs (humanoids, animals with vanilla models) limbs now flop right away: in the first 0.5 s the largest limb-to-torso bend is about 110 degrees, against 13 degrees originally. Mobs on the rigid path (Alex's Mobs, Naturalist) are a single physics body, so they tumble and land as one piece; they cannot flop limb by limb.
+## Not checked
 
-**Not verified** (no Forge/Minecraft was available where this was written, so it was never built with ForgeGradle or run in game):
+The physics is tested; the Minecraft side is not. There was no Forge or Minecraft available when this was written, so it hasn't been built with ForgeGradle or played, only compile-checked against the real Saro classes with stand-ins for the Minecraft API. If something fails to compile, look in `DummyFactory` and `ClientRagdollManagerMixin` first (`ClientLevel#removeEntity`, `SynchedEntityData#getNonDefaultValues/assignValues`).
 
-- It was compile-checked against the real Saro classes with small stand-ins for the Minecraft/Forge/Mixin API, so Saro-side names and signatures are confirmed, and the mixin target strings were checked against the jar's bytecode. The Minecraft-side calls are standard 1.20.1 API but were not compiled against the real thing. If one fails to compile, it is in `DummyFactory` or `ClientRagdollManagerMixin.saros_fix$spawnTail` (`ClientLevel#removeEntity`, `SynchedEntityData#getNonDefaultValues/assignValues`).
-- Whether Alex's Mobs / Naturalist renderers draw correctly from the never-ticked copy (they get no walk/idle animation, so they are drawn in their default pose and tumble as one piece; limbs do not flop).
-- The 180 degree facing correction in `DummyFactory.RENDER_YAW` (reasoned from the renderer code: living renderers rotate by 180 - bodyYaw). If a rigid mob starts facing backwards, set it to 0 or set `perRagdollModel=false`.
-- Mixins use `defaultRequire: 1`, so if a different Saro build moved a target the game stops with a clear mixin error instead of silently doing nothing.
+Also unchecked in game: how Alex's Mobs and Naturalist draw from the never-ticked copy, and the 180 degree facing in `DummyFactory.RENDER_YAW`. If a mob faces backwards, set it to 0 or turn off `perRagdollModel`.
+
+The mixins use `defaultRequire: 1`, so a Saro build that moved a target stops the game with a mixin error instead of silently doing nothing.
