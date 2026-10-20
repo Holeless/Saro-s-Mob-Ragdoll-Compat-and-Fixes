@@ -1,0 +1,48 @@
+name: Dump Saro classes
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Get Saro jar
+        env:
+          SARO_JAR_URL: ${{ secrets.SARO_JAR_URL }}
+        run: |
+          mkdir -p libs
+          if ls libs/*.jar >/dev/null 2>&1; then
+            echo "Using jar from libs/"
+          elif [ -n "$SARO_JAR_URL" ]; then
+            curl -fsSL -o libs/saro.jar "$SARO_JAR_URL"
+          else
+            echo "::error::No jar. Put it in libs/ or set SARO_JAR_URL."
+            exit 1
+          fi
+
+      - name: javap
+        run: |
+          JAR=$(ls libs/*.jar | head -n1)
+          mkdir -p dump
+          javap -p -c -cp "$JAR" \
+            de.sarocesch.sarosmobragdoll.client.ClientMobRagdoll \
+            de.sarocesch.sarosmobragdoll.client.ClientRagdollManager \
+            > dump/bytecode.txt
+          javap -p -cp "$JAR" \
+            de.sarocesch.sarosmobragdoll.client.skeleton.MobSkeleton \
+            de.sarocesch.sarosmobragdoll.client.skeleton.Bone \
+            > dump/signatures.txt
+          unzip -l "$JAR" | grep '\.class' > dump/classlist.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saro-dump
+          path: dump/
