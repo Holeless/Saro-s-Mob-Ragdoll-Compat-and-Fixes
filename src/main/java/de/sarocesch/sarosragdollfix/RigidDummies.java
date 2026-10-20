@@ -1,15 +1,20 @@
 package de.sarocesch.sarosragdollfix;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import de.sarocesch.sarosmobragdoll.client.ClientMobRagdoll;
 import de.sarocesch.sarosmobragdoll.client.skeleton.MobSkeleton;
+import de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonLayer;
 import de.sarocesch.sarosmobragdoll.client.skeleton.VanillaModelSkeletonProvider;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.WeakHashMap;
 import javax.annotation.Nullable;
 import net.minecraft.client.Minecraft;
@@ -17,8 +22,10 @@ import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -34,6 +41,10 @@ public final class RigidDummies {
    private static final Map<ClientMobRagdoll, Map<RenderType, RenderType>> LAYER_TYPES = Collections.synchronizedMap(new WeakHashMap<>());
    private static final Map<ClientMobRagdoll, List<RenderType>> EXTRA_TYPES = Collections.synchronizedMap(new WeakHashMap<>());
    private static final Map<ClientMobRagdoll, List<WoundCompat.Wound>> WOUNDS = Collections.synchronizedMap(new WeakHashMap<>());
+
+   // villager skins we painted ourselves, freed with the ragdoll
+   private static final Map<ClientMobRagdoll, ResourceLocation> OWN_SKINS = Collections.synchronizedMap(new WeakHashMap<>());
+   private static boolean hookLogged;
 
    private static boolean reflectionTried;
    private static Method typesUsedBy;
@@ -86,6 +97,18 @@ public final class RigidDummies {
    public static void release(ClientMobRagdoll ragdoll) {
       List<WoundCompat.Wound> w = WOUNDS.remove(ragdoll);
       WoundCompat.releaseAll(w);
+      ResourceLocation skin = OWN_SKINS.remove(ragdoll);
+      if (skin != null) {
+         Minecraft.getInstance().getTextureManager().release(skin);
+      }
+   }
+
+   /** Logged once, so the log shows whether the overlay hook in renderLayersFor ever runs. */
+   public static void noteOverlayHook() {
+      if (!hookLogged) {
+         hookLogged = true;
+         SarosRagdollFix.LOG.info("[ragdoll-fix] overlay hook in renderLayersFor is running");
+      }
    }
 
    // Adds to the overlay list instead of replacing it, so villager clothes and golem cracks can both be there.
@@ -110,11 +133,31 @@ public final class RigidDummies {
          return;
       }
 
-      // done first and separately so a failure in the renderer lookups below can't skip it
-      try {
-         addVillagerClothes(ragdoll, dummy);
-      } catch (Throwable t) {
-         SarosRagdollFix.LOG.debug("[ragdoll-fix] villager clothes failed for {}", type, t);
+      // The base texture goes through a hook we know runs, so a villager's profession is painted into it.
+      ResourceLocation skin = null;
+      if (skeleton.renderer != null) {
+         try {
+            ResourceLocation tex = ((EntityRenderer)skeleton.renderer).getTextureLocation(dummy);
+            if (tex != null) {
+               skin = buildVillagerSkin(dummy, tex);
+               if (skin != null) {
+                  OWN_SKINS.put(ragdoll, skin);
+               }
+
+               TEXTURES.put(ragdoll, skin != null ? skin : tex);
+            }
+         } catch (Throwable t) {
+            SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve texture for {}", type, t);
+         }
+      }
+
+      if (skin == null) {
+         // no painted skin (not a villager, or painting failed): draw the clothes as an overlay instead
+         try {
+            addVillagerClothes(ragdoll, dummy);
+         } catch (Throwable t) {
+            SarosRagdollFix.LOG.debug("[ragdoll-fix] villager clothes failed for {}", type, t);
+         }
       }
 
       if (skeleton.renderer == null) {
@@ -122,17 +165,133 @@ public final class RigidDummies {
       }
 
       try {
-         ResourceLocation tex = ((EntityRenderer)skeleton.renderer).getTextureLocation(dummy);
-         if (tex != null) {
-            TEXTURES.put(ragdoll, tex);
-         }
-
          captureLayers(ragdoll, skeleton, dummy);
          if (FixConfig.COPY_DAMAGE_STATE.get()) {
             captureExtras(ragdoll, skeleton, dummy);
          }
+
+         if (skin != null) {
+            redirectTypeLayers(ragdoll, skeleton, skin);
+         }
       } catch (Throwable t) {
          SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve look for {}", type, t);
+      }
+   }
+
+   // Biome, profession and level textures laid over the villager's base texture in vanilla's order, as one new texture.
+   // Null if this isn't an adult villager with a profession, or if anything goes wrong.
+   @Nullable
+   private static ResourceLocation buildVillagerSkin(Entity dummy, ResourceLocation base) {
+      if (dummy instanceof ZombieVillager || !(dummy instanceof VillagerDataHolder holder) || !(dummy instanceof LivingEntity living) || living.isBaby()) {
+         return null;
+      }
+
+      VillagerData data = holder.getVillagerData();
+      VillagerProfession profession = data.getProfession();
+      if (profession == VillagerProfession.NONE) {
+         return null;
+      }
+
+      List<ResourceLocation> overlays = new ArrayList<>();
+      ResourceLocation typeId = BuiltInRegistries.VILLAGER_TYPE.getKey(data.getType());
+      overlays.add(new ResourceLocation(typeId.getNamespace(), "textures/entity/villager/type/" + typeId.getPath() + ".png"));
+      ResourceLocation id = BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
+      overlays.add(new ResourceLocation(id.getNamespace(), "textures/entity/villager/profession/" + id.getPath() + ".png"));
+      if (profession != VillagerProfession.NITWIT) {
+         String[] badges = {"stone", "iron", "gold", "emerald", "diamond"};
+         int lvl = Math.max(1, Math.min(5, data.getLevel()));
+         overlays.add(new ResourceLocation("textures/entity/villager/profession_level/" + badges[lvl - 1] + ".png"));
+      }
+
+      NativeImage out = readImage(base);
+      if (out == null) {
+         SarosRagdollFix.LOG.info("[ragdoll-fix] could not read villager base texture {}", base);
+         return null;
+      }
+
+      try {
+         for (ResourceLocation loc : overlays) {
+            NativeImage over = readImage(loc);
+            if (over == null) {
+               continue;
+            }
+
+            try {
+               if (over.getWidth() == out.getWidth() && over.getHeight() == out.getHeight()) {
+                  blend(out, over);
+               }
+            } finally {
+               over.close();
+            }
+         }
+
+         ResourceLocation skin = Minecraft.getInstance().getTextureManager().register("saros_fix_villager", new DynamicTexture(out));
+         SarosRagdollFix.LOG.info("[ragdoll-fix] painted villager skin for {} (level {})", id, data.getLevel());
+         return skin;
+      } catch (Throwable t) {
+         out.close();
+         SarosRagdollFix.LOG.warn("[ragdoll-fix] could not paint villager skin", t);
+         return null;
+      }
+   }
+
+   @Nullable
+   private static NativeImage readImage(ResourceLocation location) {
+      Optional<Resource> res = Minecraft.getInstance().getResourceManager().getResource(location);
+      if (res.isEmpty()) {
+         return null;
+      }
+
+      try (InputStream in = res.get().open()) {
+         return NativeImage.read(in);
+      } catch (IOException e) {
+         return null;
+      }
+   }
+
+   // normal alpha-over, per channel (the packing order doesn't matter for that)
+   private static void blend(NativeImage dst, NativeImage src) {
+      for (int y = 0; y < dst.getHeight(); y++) {
+         for (int x = 0; x < dst.getWidth(); x++) {
+            int s = src.getPixelRGBA(x, y);
+            int sa = s >>> 24;
+            if (sa == 0) {
+               continue;
+            }
+
+            if (sa == 255) {
+               dst.setPixelRGBA(x, y, s);
+               continue;
+            }
+
+            int d = dst.getPixelRGBA(x, y);
+            int result = 0;
+            for (int shift = 0; shift < 24; shift += 8) {
+               int c = (((s >> shift) & 255) * sa + ((d >> shift) & 255) * (255 - sa)) / 255;
+               result |= c << shift;
+            }
+
+            int da = d >>> 24;
+            result |= Math.min(255, sa + da * (255 - sa) / 255) << 24;
+            dst.setPixelRGBA(x, y, result);
+         }
+      }
+   }
+
+   // The original draws the biome texture as a layer on top of the base. That would cover the painted profession,
+   // so those layers draw the painted skin instead.
+   private static void redirectTypeLayers(ClientMobRagdoll ragdoll, MobSkeleton skeleton, ResourceLocation skin) {
+      Object layers = skeleton.layers;
+      if (!(layers instanceof Iterable<?> all)) {
+         return;
+      }
+
+      RenderType own = RenderType.entityCutoutNoCull(skin);
+      Map<RenderType, RenderType> map = LAYER_TYPES.computeIfAbsent(ragdoll, k -> new HashMap<>());
+      for (Object o : all) {
+         if (o instanceof SkeletonLayer layer && layer.renderType != null && layer.renderType.toString().contains("textures/entity/villager/type/")) {
+            map.put(layer.renderType, own);
+         }
       }
    }
 

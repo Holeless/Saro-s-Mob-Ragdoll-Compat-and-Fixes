@@ -80,6 +80,7 @@ public abstract class ClientMobRagdollMixin {
    // Both are the same cubes with a different texture. The pose stack is already at the bone.
    @Inject(method = "renderLayersFor", at = @At("RETURN"))
    private void saros_fix$ownOverlays(int boneIndex, Bone bone, PoseStack pose, MultiBufferSource buffers, int light, float alpha, CallbackInfo ci) {
+      RigidDummies.noteOverlayHook();
       ClientMobRagdoll self = (ClientMobRagdoll)(Object)this;
       List<RenderType> extras = RigidDummies.extraTypes(self);
       List<WoundCompat.Wound> wounds = RigidDummies.wounds(self);
