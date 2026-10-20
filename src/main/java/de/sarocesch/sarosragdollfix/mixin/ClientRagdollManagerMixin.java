@@ -37,10 +37,6 @@ public abstract class ClientRagdollManagerMixin {
    @Unique
    private int saros_fix$sizeBefore;
 
-   /**
-    * Replace the original uniform launch. {@code spawn} calls {@code physics.setUniformVelocity(launch)} right after the
-    * body is built; the entity type is read from the spawn arguments, which a redirect cannot see, so it is stashed here.
-    */
    @Unique
    private EntityType<?> saros_fix$type;
 
@@ -65,7 +61,6 @@ public abstract class ClientRagdollManagerMixin {
       }
    }
 
-   /** Mods in {@code compat.forceRigid} skip the guessed ModelPart skeleton: returning null makes the original use its rigid fallback (and cache it). */
    @Redirect(
       method = "resolveSkeleton",
       at = @At(
@@ -78,9 +73,8 @@ public abstract class ClientRagdollManagerMixin {
    }
 
    /**
-    * After a rigid ragdoll was added: give it its own render copy of the mob, and remove the original entity. The
-    * original mod only sets the entity invisible and cancels RenderLivingEvent, which GeckoLib renderers (not living
-    * renderers in 1.20.1) never fire and Citadel renderers can ignore: the frozen duplicate.
+    * After a ragdoll was added. Rigid: give it its own render copy and remove the original entity. Normal (ModelPart):
+    * remember this mob's own texture so the variant (white rabbit etc.) is kept.
     */
    @Inject(method = "spawn", at = @At("RETURN"))
    private void saros_fix$spawnTail(
@@ -92,12 +86,20 @@ public abstract class ClientRagdollManagerMixin {
 
       ClientMobRagdoll rag = this.ragdolls.get(this.ragdolls.size() - 1);
       MobSkeleton skeleton = ((ClientMobRagdollAccessor)(Object)rag).saros_fix$getSkeleton();
-      if (skeleton == null || !skeleton.rigid) {
+      if (skeleton == null) {
          return;
       }
 
       ClientLevel level = Minecraft.getInstance().level;
       Entity live = level != null && entityId >= 0 ? level.getEntity(entityId) : null;
+
+      if (!skeleton.rigid) {
+         if (level != null && FixConfig.OWN_RENDER_DUMMY.get()) {
+            RigidDummies.captureTexture(rag, skeleton, type, level, live, baby);
+         }
+         return;
+      }
+
       if (level != null && FixConfig.OWN_RENDER_DUMMY.get()) {
          Entity dummy = DummyFactory.create(type, level, live, baby);
          if (dummy != null) {
