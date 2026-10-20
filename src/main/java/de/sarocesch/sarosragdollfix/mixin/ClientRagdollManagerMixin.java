@@ -59,6 +59,10 @@ public abstract class ClientRagdollManagerMixin {
    @Unique
    private SleepTracker.Spot saros_fix$sleep;
 
+   // render copy built while the mob is still in the world, so variant and villager profession are still readable
+   @Unique
+   private Entity saros_fix$look;
+
    @Unique
    private double saros_fix$x;
 
@@ -77,6 +81,7 @@ public abstract class ClientRagdollManagerMixin {
    ) {
       this.saros_fix$wounds = null;
       this.saros_fix$sleep = null;
+      this.saros_fix$look = null;
       this.saros_fix$type = type;
       this.saros_fix$sizeBefore = this.ragdolls.size();
       this.saros_fix$x = x;
@@ -96,6 +101,10 @@ public abstract class ClientRagdollManagerMixin {
       }
 
       Entity live = entityId >= 0 ? level.getEntity(entityId) : null;
+      if (live != null && FixConfig.OWN_RENDER_DUMMY.get()) {
+         this.saros_fix$look = DummyFactory.create(type, level, live, baby);
+      }
+
       if (FixConfig.LAY_SLEEPERS.get() && entityId >= 0) {
          this.saros_fix$sleep = SleepTracker.take(live, entityId, level.getGameTime());
       }
@@ -163,6 +172,8 @@ public abstract class ClientRagdollManagerMixin {
       List<WoundCompat.Wound> wounds = this.saros_fix$wounds;
       this.saros_fix$wounds = null;
       this.saros_fix$sleep = null;
+      Entity look = this.saros_fix$look;
+      this.saros_fix$look = null;
 
       if (this.ragdolls.size() <= this.saros_fix$sizeBefore) {
          WoundCompat.releaseAll(wounds);
@@ -186,7 +197,7 @@ public abstract class ClientRagdollManagerMixin {
 
       if (!skeleton.rigid) {
          if (level != null && FixConfig.OWN_RENDER_DUMMY.get()) {
-            RigidDummies.captureLook(rag, skeleton, type, level, live, baby);
+            RigidDummies.captureLook(rag, skeleton, type, level, live, look, baby);
          }
 
          // converted GeckoLib mobs ignore the original mod's hide trick, so remove the original
@@ -197,7 +208,7 @@ public abstract class ClientRagdollManagerMixin {
       }
 
       if (level != null && FixConfig.OWN_RENDER_DUMMY.get()) {
-         Entity dummy = DummyFactory.create(type, level, live, baby);
+         Entity dummy = look != null ? look : DummyFactory.create(type, level, live, baby);
          if (dummy != null) {
             RigidDummies.put(rag, dummy);
          }

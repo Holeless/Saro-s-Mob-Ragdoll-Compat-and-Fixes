@@ -83,13 +83,13 @@ public final class RigidDummies {
 
    // Normal ragdolls: ask the mob's renderer which texture and layers this mob uses. The original caches one per type.
    @SuppressWarnings({"unchecked", "rawtypes"})
-   public static void captureLook(ClientMobRagdoll ragdoll, MobSkeleton skeleton, EntityType<?> type, ClientLevel level, @Nullable Entity live, boolean baby) {
+   public static void captureLook(ClientMobRagdoll ragdoll, MobSkeleton skeleton, EntityType<?> type, ClientLevel level, @Nullable Entity live, @Nullable Entity prebuilt, boolean baby) {
       if (skeleton.renderer == null) {
          return;
       }
 
       try {
-         Entity dummy = DummyFactory.create(type, level, live, baby);
+         Entity dummy = prebuilt != null ? prebuilt : DummyFactory.create(type, level, live, baby);
          if (dummy == null) {
             return;
          }
@@ -149,8 +149,12 @@ public final class RigidDummies {
          for (Object layer : (List<Object>)layerObjects.invoke(null, skeleton.renderer)) {
             List<RenderType> old = (List<RenderType>)typesUsedBy.invoke(null, layer, skeleton.dummy);
             List<RenderType> now = (List<RenderType>)typesUsedBy.invoke(null, layer, dummy);
-            if (old != null && now != null && !old.isEmpty() && !now.isEmpty() && !old.get(0).equals(now.get(0))) {
-               map.put(old.get(0), now.get(0));
+            if (old != null && now != null) {
+               for (int k = 0; k < Math.min(old.size(), now.size()); k++) {
+                  if (!old.get(k).equals(now.get(k))) {
+                     map.put(old.get(k), now.get(k));
+                  }
+               }
             }
          }
 
@@ -163,9 +167,9 @@ public final class RigidDummies {
       }
    }
 
-   // Layers that draw nothing on the shared default mob but do on this one, so the original never collected them.
-   // Iron golem cracks: the default golem is undamaged so every golem ragdoll came out like new. Only layers that redraw
-   // the mob's own model are taken (same cubes, other texture).
+   // Layer types the shared default mob doesn't have but this one does, so the original never collected them. Iron golem
+   // cracks (default golem is undamaged), villager profession and level (default villager has none). Only layers that
+   // redraw the mob's own model are taken (same cubes, other texture).
    @SuppressWarnings("unchecked")
    private static void captureExtras(ClientMobRagdoll ragdoll, MobSkeleton skeleton, Entity dummy) {
       if (skeleton.renderer == null) {
@@ -185,11 +189,16 @@ public final class RigidDummies {
                continue;
             }
 
+            // the default mob may already have some of this layer's types (a villager has its biome one), only the
+            // extra ones at the end are ours (profession, level badge)
+            int skip = 0;
             if (skeleton.dummy != null) {
                List<RenderType> old = (List<RenderType>)typesUsedBy.invoke(null, layer, skeleton.dummy);
-               if (old != null && !old.isEmpty()) {
-                  continue;
-               }
+               skip = old == null ? 0 : old.size();
+            }
+
+            if (skip >= now.size()) {
+               continue;
             }
 
             if (findModel != null) {
@@ -199,7 +208,7 @@ public final class RigidDummies {
                }
             }
 
-            for (RenderType rt : now) {
+            for (RenderType rt : now.subList(skip, now.size())) {
                if (rt.format() == DefaultVertexFormat.NEW_ENTITY && !extras.contains(rt)) {
                   extras.add(rt);
                }
