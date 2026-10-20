@@ -22,6 +22,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.ZombieVillager;
 import net.minecraft.world.entity.npc.VillagerData;
 import net.minecraft.world.entity.npc.VillagerDataHolder;
 import net.minecraft.world.entity.npc.VillagerProfession;
@@ -87,30 +88,66 @@ public final class RigidDummies {
       WoundCompat.releaseAll(w);
    }
 
+   // Adds to the ragdoll's overlay list (never replaces it, so villager clothes and golem cracks can both be there).
+   private static void mergeExtras(ClientMobRagdoll ragdoll, List<RenderType> add) {
+      if (add.isEmpty()) {
+         return;
+      }
+
+      synchronized (EXTRA_TYPES) {
+         List<RenderType> old = EXTRA_TYPES.get(ragdoll);
+         List<RenderType> merged = old == null ? new ArrayList<>() : new ArrayList<>(old);
+         for (RenderType rt : add) {
+            if (!merged.contains(rt)) {
+               merged.add(rt);
+            }
+         }
+
+         EXTRA_TYPES.put(ragdoll, merged);
+      }
+   }
+
    // Normal ragdolls: ask the mob's renderer which texture and layers this mob uses. The original caches one per type.
    @SuppressWarnings({"unchecked", "rawtypes"})
    public static void captureLook(ClientMobRagdoll ragdoll, MobSkeleton skeleton, EntityType<?> type, ClientLevel level, @Nullable Entity live, @Nullable Entity prebuilt, boolean baby) {
+      Entity dummy;
+      try {
+         dummy = prebuilt != null ? prebuilt : DummyFactory.create(type, level, live, baby);
+      } catch (Throwable t) {
+         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve look for {}", type, t);
+         return;
+      }
+
+      if (dummy == null) {
+         return;
+      }
+
+      // first and on its own: reads the villager's data directly, so it doesn't depend on the renderer or on what
+      // the layer probe found, and a failure further down can't skip it
+      try {
+         addVillagerClothes(ragdoll, dummy);
+      } catch (Throwable t) {
+         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not add villager clothes for {}", type, t);
+      }
+
       if (skeleton.renderer == null) {
          return;
       }
 
       try {
-         Entity dummy = prebuilt != null ? prebuilt : DummyFactory.create(type, level, live, baby);
-         if (dummy == null) {
-            return;
-         }
-
          ResourceLocation tex = ((EntityRenderer)skeleton.renderer).getTextureLocation(dummy);
          if (tex != null) {
             TEXTURES.put(ragdoll, tex);
          }
+      } catch (Throwable t) {
+         SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve texture for {}", type, t);
+      }
 
+      try {
          captureLayers(ragdoll, skeleton, dummy);
          if (FixConfig.COPY_DAMAGE_STATE.get()) {
             captureExtras(ragdoll, skeleton, dummy);
          }
-
-         addVillagerClothes(ragdoll, dummy);
       } catch (Throwable t) {
          SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve look for {}", type, t);
       }
@@ -118,8 +155,9 @@ public final class RigidDummies {
 
    // Villager clothes (profession texture and level badge) read straight from the villager's data, same textures and
    // order as vanilla's VillagerProfessionLayer. Doesn't depend on what Saro's layer probe found.
+   // Zombie villagers use other textures and are left to the layer capture.
    private static void addVillagerClothes(ClientMobRagdoll ragdoll, Entity dummy) {
-      if (!(dummy instanceof VillagerDataHolder holder) || !(dummy instanceof LivingEntity living) || living.isBaby()) {
+      if (dummy instanceof ZombieVillager || !(dummy instanceof VillagerDataHolder holder) || !(dummy instanceof LivingEntity living) || living.isBaby()) {
          return;
       }
 
@@ -129,8 +167,7 @@ public final class RigidDummies {
          return;
       }
 
-      List<RenderType> old = EXTRA_TYPES.get(ragdoll);
-      List<RenderType> extras = old == null ? new ArrayList<>() : new ArrayList<>(old);
+      List<RenderType> extras = new ArrayList<>();
       ResourceLocation id = BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
       addTexture(extras, new ResourceLocation(id.getNamespace(), "textures/entity/villager/profession/" + id.getPath() + ".png"));
       if (profession != VillagerProfession.NITWIT) {
@@ -139,9 +176,7 @@ public final class RigidDummies {
          addTexture(extras, new ResourceLocation("textures/entity/villager/profession_level/" + badges[level - 1] + ".png"));
       }
 
-      if (!extras.isEmpty()) {
-         EXTRA_TYPES.put(ragdoll, extras);
-      }
+      mergeExtras(ragdoll, extras);
    }
 
    private static void addTexture(List<RenderType> out, ResourceLocation texture) {
@@ -150,6 +185,8 @@ public final class RigidDummies {
          if (!out.contains(type)) {
             out.add(type);
          }
+      } else {
+         SarosRagdollFix.LOG.debug("[ragdoll-fix] texture {} not found", texture);
       }
    }
 
@@ -285,9 +322,7 @@ public final class RigidDummies {
             }
          }
 
-         if (!extras.isEmpty()) {
-            EXTRA_TYPES.put(ragdoll, extras);
-         }
+         mergeExtras(ragdoll, extras);
       } catch (Throwable t) {
          SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve damage overlays", t);
       }

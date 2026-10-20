@@ -102,7 +102,7 @@ public abstract class ClientRagdollManagerMixin {
 
       Entity live = entityId >= 0 ? level.getEntity(entityId) : null;
       if (live != null && FixConfig.OWN_RENDER_DUMMY.get()) {
-         this.saros_fix$look = DummyFactory.create(type, level, live, baby);
+         this.saros_fix$look = DummyFactory.create(type, level, live, entityId, baby);
       }
 
       if (FixConfig.LAY_SLEEPERS.get() && entityId >= 0) {
@@ -197,7 +197,9 @@ public abstract class ClientRagdollManagerMixin {
 
       if (!skeleton.rigid) {
          if (level != null && FixConfig.OWN_RENDER_DUMMY.get()) {
-            RigidDummies.captureLook(rag, skeleton, type, level, live, look, baby);
+            // no copy from spawn() (the live mob was already gone): build one from what the trackers remember
+            Entity copy = look != null ? look : DummyFactory.create(type, level, live, entityId, baby);
+            RigidDummies.captureLook(rag, skeleton, type, level, live, copy, baby);
          }
 
          // converted GeckoLib mobs ignore the original mod's hide trick, so remove the original
@@ -208,7 +210,7 @@ public abstract class ClientRagdollManagerMixin {
       }
 
       if (level != null && FixConfig.OWN_RENDER_DUMMY.get()) {
-         Entity dummy = look != null ? look : DummyFactory.create(type, level, live, baby);
+         Entity dummy = look != null ? look : DummyFactory.create(type, level, live, entityId, baby);
          if (dummy != null) {
             RigidDummies.put(rag, dummy);
          }

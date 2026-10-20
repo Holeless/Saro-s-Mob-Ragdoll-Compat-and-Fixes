@@ -23,11 +23,13 @@ public final class ClientEvents {
          HealthTracker.clear();
          RagdollCleanup.clear();
          SleepTracker.clear();
+         VillagerTracker.clear();
          return;
       }
 
       HealthTracker.tick(level);
       RagdollCleanup.tick(level);
       SleepTracker.tick(level);
+      VillagerTracker.tick(level);
    }
 }
