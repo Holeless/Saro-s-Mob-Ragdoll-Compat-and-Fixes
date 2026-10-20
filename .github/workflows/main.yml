@@ -1,0 +1,58 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # only used to attach the jar to a release on v* tags
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.8
+
+      # Saro's Mob Ragdoll is All Rights Reserved, so it is not in the repo. It is needed to compile against.
+      # Either: add a repository secret SARO_JAR_URL (a direct download link to the 1.20.1 jar),
+      #     or: in a PRIVATE repo only, force-add the jar:  git add -f libs/<jar>
+      - name: Get Saro's Mob Ragdoll (compile-only dependency)
+        env:
+          SARO_JAR_URL: ${{ secrets.SARO_JAR_URL }}
+        run: |
+          mkdir -p libs
+          if ls libs/*.jar >/dev/null 2>&1; then
+            echo "Using jar from libs/"
+          elif [ -n "$SARO_JAR_URL" ]; then
+            curl -fsSL -o libs/Saros-Mob-Ragdoll-Forge-1.20.1.jar "$SARO_JAR_URL"
+          else
+            echo "::error::No Saro's Mob Ragdoll jar. Add the SARO_JAR_URL secret or put the jar in libs/."
+            exit 1
+          fi
+
+      - name: Build
+        run: gradle build --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saros_ragdoll_fix-jar
+          path: build/libs/*.jar
+          if-no-files-found: error
+
+      - name: Attach jar to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libs/*.jar
