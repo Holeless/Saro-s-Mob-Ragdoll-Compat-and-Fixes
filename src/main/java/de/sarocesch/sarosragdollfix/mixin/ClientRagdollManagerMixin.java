@@ -8,6 +8,7 @@ import de.sarocesch.sarosmobragdoll.client.skeleton.VanillaModelSkeletonProvider
 import de.sarocesch.sarosmobragdoll.ragdoll.physics.BoneRagdollPhysics;
 import de.sarocesch.sarosragdollfix.DummyFactory;
 import de.sarocesch.sarosragdollfix.FixConfig;
+import de.sarocesch.sarosragdollfix.GeoSkeletons;
 import de.sarocesch.sarosragdollfix.RagdollLaunch;
 import de.sarocesch.sarosragdollfix.RigidDummies;
 import java.util.List;
@@ -69,6 +70,14 @@ public abstract class ClientRagdollManagerMixin {
       )
    )
    private MobSkeleton saros_fix$skipGuessedSkeleton(VanillaModelSkeletonProvider provider, EntityType<?> type, ClientLevel level, boolean baby) {
+      if (FixConfig.CONVERT_GEO.get()) {
+         // GeckoLib mobs: convert the .geo.json so they get limbs. Null = not convertible, use the old behaviour.
+         MobSkeleton converted = GeoSkeletons.tryBuild(provider, type, level, baby);
+         if (converted != null) {
+            return converted;
+         }
+      }
+
       return FixConfig.isForcedRigid(type) ? null : provider.build(type, level, baby);
    }
 
@@ -95,7 +104,13 @@ public abstract class ClientRagdollManagerMixin {
 
       if (!skeleton.rigid) {
          if (level != null && FixConfig.OWN_RENDER_DUMMY.get()) {
-            RigidDummies.captureTexture(rag, skeleton, type, level, live, baby);
+            RigidDummies.captureLook(rag, skeleton, type, level, live, baby);
+         }
+
+         // Converted GeckoLib mobs: their renderer ignores the original mod's hide trick, so remove the original.
+         if (level != null && live != null && GeoSkeletons.isConverted(skeleton) && FixConfig.REMOVE_ORIGINAL_FOR_RIGID.get()) {
+            live.setInvisible(true);
+            level.removeEntity(entityId, Entity.RemovalReason.DISCARDED);
          }
          return;
       }

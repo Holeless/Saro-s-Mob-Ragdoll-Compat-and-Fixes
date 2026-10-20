@@ -9,7 +9,8 @@
     "BoneRagdollPhysicsMixin",
     "ClientMobRagdollAccessor",
     "ClientMobRagdollMixin",
-    "ClientRagdollManagerMixin"
+    "ClientRagdollManagerMixin",
+    "VanillaModelSkeletonProviderMixin"
   ],
   "injectors": {
     "defaultRequire": 1

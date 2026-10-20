@@ -2,7 +2,9 @@ package de.sarocesch.sarosragdollfix.mixin;
 
 import de.sarocesch.sarosmobragdoll.client.ClientMobRagdoll;
 import de.sarocesch.sarosmobragdoll.client.skeleton.MobSkeleton;
+import de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonLayer;
 import de.sarocesch.sarosragdollfix.RigidDummies;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import org.objectweb.asm.Opcodes;
@@ -37,5 +39,18 @@ public abstract class ClientMobRagdollMixin {
    )
    private ResourceLocation saros_fix$ownTexture(MobSkeleton skeleton) {
       return RigidDummies.textureFor((ClientMobRagdoll)(Object)this, skeleton);
+   }
+
+   /** Overlay layers (villager profession, biome ...): use this mob's own, not the cached default mob's. */
+   @Redirect(
+      method = "renderLayersFor",
+      at = @At(
+         value = "FIELD",
+         target = "Lde/sarocesch/sarosmobragdoll/client/skeleton/SkeletonLayer;renderType:Lnet/minecraft/client/renderer/RenderType;",
+         opcode = Opcodes.GETFIELD
+      )
+   )
+   private RenderType saros_fix$ownLayerType(SkeletonLayer layer) {
+      return RigidDummies.layerTypeFor((ClientMobRagdoll)(Object)this, layer.renderType);
    }
 }

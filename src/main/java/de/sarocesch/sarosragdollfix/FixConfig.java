@@ -27,6 +27,8 @@ public final class FixConfig {
    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FORCE_RIGID;
    public static final ForgeConfigSpec.BooleanValue OWN_RENDER_DUMMY;
    public static final ForgeConfigSpec.BooleanValue REMOVE_ORIGINAL_FOR_RIGID;
+   public static final ForgeConfigSpec.BooleanValue CONVERT_GEO;
+   public static final ForgeConfigSpec.ConfigValue<List<? extends String>> GEO_HIDDEN_BONES;
 
    static {
       ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -62,17 +64,28 @@ public final class FixConfig {
             "The original mod falls back to one rigid body for these. It never moved or toppled, and the original mob kept",
             "standing there. Here the rigid body topples, is drawn with the mob's own renderer, and the original is removed.")
          .push("compat");
+      CONVERT_GEO = b.comment(
+            "GeckoLib mobs (Naturalist ...): read the mob's .geo.json and build a limb-by-limb skeleton from it, so they ragdoll",
+            "with flopping limbs like vanilla mobs. If a model cannot be converted it falls back to the rigid box.",
+            "false = always use the rigid box.")
+         .define("convertGeoModels", true);
+      GEO_HIDDEN_BONES = b.comment(
+            "Bone names (lower case) that GeckoLib mobs show only in certain states (sleeping, angry ...). They are left out of",
+            "the converted skeleton, otherwise they would be drawn on top of the normal parts. Bones named baby_* are only",
+            "used for baby mobs.")
+         .defineListAllowEmpty("geoHiddenBones", List.of("sleep", "sleeping", "angry", "head_angry", "snout_angry"), o -> o instanceof String);
       FORCE_RIGID = b.comment(
             "Mod namespaces (\"alexsmobs\") or single entity ids (\"naturalist:bear\") that always use the rigid real-model path,",
-            "even if the original mod could guess a partial skeleton for them.")
+            "even if the original mod could guess a partial skeleton for them. A GeckoLib mob that converts successfully",
+            "(see convertGeoModels) takes priority over this list.")
          .defineListAllowEmpty("forceRigid", List.of("alexsmobs", "naturalist"), o -> o instanceof String);
       OWN_RENDER_DUMMY = b.comment(
-            "Draw each rigid ragdoll from its own copy of the mob that carries the dead mob's variant/colour and is turned the",
-            "right way round. false = the original mod's shared default-variant copy, which also faces backwards.")
+            "Draw each ragdoll from its own copy of the mob that carries the dead mob's variant/colour/profession (and, for rigid",
+            "ragdolls, is turned the right way round). false = the original mod's shared default-variant copy.")
          .define("perRagdollModel", true);
       REMOVE_ORIGINAL_FOR_RIGID = b.comment(
-            "Remove the dying mob from the client world the moment a rigid ragdoll replaces it. Needed because GeckoLib and",
-            "Citadel renderers do not always honour the original mod's hide trick, which left a frozen duplicate.")
+            "Remove the dying mob from the client world the moment a rigid or converted GeckoLib ragdoll replaces it. Needed",
+            "because GeckoLib and Citadel renderers do not always honour the original mod's hide trick (frozen duplicate).")
          .define("removeOriginal", true);
       b.pop();
 
