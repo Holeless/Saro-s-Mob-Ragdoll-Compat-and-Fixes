@@ -14,6 +14,7 @@ import de.sarocesch.sarosragdollfix.RagdollCleanup;
 import de.sarocesch.sarosragdollfix.RagdollLaunch;
 import de.sarocesch.sarosragdollfix.RigidDummies;
 import de.sarocesch.sarosragdollfix.SarosRagdollFix;
+import de.sarocesch.sarosragdollfix.SizeFix;
 import de.sarocesch.sarosragdollfix.SleepPose;
 import de.sarocesch.sarosragdollfix.SleepTracker;
 import de.sarocesch.sarosragdollfix.WoundCompat;
@@ -31,6 +32,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = ClientRagdollManager.class, remap = false)
 public abstract class ClientRagdollManagerMixin {
@@ -63,6 +65,13 @@ public abstract class ClientRagdollManagerMixin {
    @Unique
    private Entity saros_fix$look;
 
+   // the mob as it was in the world, for its real size
+   @Unique
+   private Entity saros_fix$live;
+
+   @Unique
+   private boolean saros_fix$baby;
+
    @Unique
    private double saros_fix$x;
 
@@ -82,6 +91,8 @@ public abstract class ClientRagdollManagerMixin {
       this.saros_fix$wounds = null;
       this.saros_fix$sleep = null;
       this.saros_fix$look = null;
+      this.saros_fix$live = null;
+      this.saros_fix$baby = baby;
       this.saros_fix$type = type;
       this.saros_fix$sizeBefore = this.ragdolls.size();
       this.saros_fix$x = x;
@@ -101,6 +112,7 @@ public abstract class ClientRagdollManagerMixin {
       }
 
       Entity live = entityId >= 0 ? level.getEntity(entityId) : null;
+      this.saros_fix$live = live;
       if (live != null && FixConfig.OWN_RENDER_DUMMY.get()) {
          this.saros_fix$look = DummyFactory.create(type, level, live, entityId, baby);
       }
@@ -164,6 +176,16 @@ public abstract class ClientRagdollManagerMixin {
       }
    }
 
+   // the cached skeleton is for a default-sized mob, fit it to this one
+   @Inject(method = "resolveSkeleton", at = @At("RETURN"), cancellable = true)
+   private void saros_fix$fitSize(EntityType<?> type, ClientLevel level, boolean baby, CallbackInfoReturnable<MobSkeleton> cir) {
+      Entity entity = this.saros_fix$live != null ? this.saros_fix$live : this.saros_fix$look;
+      MobSkeleton fitted = SizeFix.fit(cir.getReturnValue(), entity, this.saros_fix$baby);
+      if (fitted != cir.getReturnValue()) {
+         cir.setReturnValue(fitted);
+      }
+   }
+
    // Rigid: give it its own render copy and remove the original. Normal: remember this mob's texture, overlays and wounds.
    @Inject(method = "spawn", at = @At("RETURN"))
    private void saros_fix$spawnTail(
@@ -174,6 +196,7 @@ public abstract class ClientRagdollManagerMixin {
       this.saros_fix$sleep = null;
       Entity look = this.saros_fix$look;
       this.saros_fix$look = null;
+      this.saros_fix$live = null;
 
       if (this.ragdolls.size() <= this.saros_fix$sizeBefore) {
          WoundCompat.releaseAll(wounds);

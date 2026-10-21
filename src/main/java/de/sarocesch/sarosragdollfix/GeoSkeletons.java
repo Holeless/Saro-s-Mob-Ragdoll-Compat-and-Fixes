@@ -38,6 +38,10 @@ public final class GeoSkeletons {
       return CONVERTED.contains(skeleton);
    }
 
+   public static void markConverted(MobSkeleton skeleton) {
+      CONVERTED.add(skeleton);
+   }
+
    // Saro's private modelOf
    @Nullable
    public static EntityModel<?> originalModelOf(EntityRenderer<?> renderer) {

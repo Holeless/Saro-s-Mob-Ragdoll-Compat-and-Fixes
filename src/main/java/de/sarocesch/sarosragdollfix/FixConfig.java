@@ -34,6 +34,7 @@ public final class FixConfig {
    public static final ForgeConfigSpec.BooleanValue COPY_DAMAGE_STATE;
    public static final ForgeConfigSpec.BooleanValue COPY_WOUNDS;
    public static final ForgeConfigSpec.BooleanValue FIX_MODEL_SCALE;
+   public static final ForgeConfigSpec.BooleanValue FIX_ENTITY_SIZE;
    public static final ForgeConfigSpec.BooleanValue DEDUPE_SPAWNS;
 
    public static final ForgeConfigSpec.BooleanValue LAY_SLEEPERS;
@@ -92,6 +93,9 @@ public final class FixConfig {
          .define("copyBloodWounds", true);
       FIX_MODEL_SCALE = b.comment("Fix models that scale themselves when drawn (adult rabbits were 1.67x too big)")
          .define("fixModelScale", true);
+      FIX_ENTITY_SIZE = b.comment("Scale the ragdoll to the size this mob actually had. The original builds one per mob type from a",
+            "default-sized mob, so grown Ice and Fire dragons ragdolled as hatchlings.")
+         .define("fixEntitySize", true);
       DEDUPE_SPAWNS = b.comment("Ignore a second spawn for the same mob (same id, or same type on the same spot in the same tick).",
             "Some GeckoLib/AzureLib mobs showed up twice. Ignored spawns are logged as [ragdoll-fix].")
          .define("dedupeSpawns", true);

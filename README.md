@@ -7,3 +7,5 @@ Fixes bug in the original mod where certain mobs like bunnies, iron golems, and 
 Fixes bug in the original mod where sleeping mobs snap out of bed instead of ragdolling in place.
 
 This mod requires Saro's Mob Ragdoll. 
+
+Ragdolls now match the size of the individual mob. The original builds one skeleton per mob type from a default-sized mob, so a grown Ice and Fire dragon ragdolled as a hatchling. Toggle: fixEntitySize.
