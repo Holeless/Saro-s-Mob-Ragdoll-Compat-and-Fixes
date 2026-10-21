@@ -25,6 +25,7 @@ public final class FixConfig {
    public static final ForgeConfigSpec.DoubleValue JOINT_LIMIT_DEGREES;
 
    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FORCE_RIGID;
+   public static final ForgeConfigSpec.ConfigValue<List<? extends String>> NO_RAGDOLL;
    public static final ForgeConfigSpec.BooleanValue OWN_RENDER_DUMMY;
    public static final ForgeConfigSpec.BooleanValue REMOVE_ORIGINAL_FOR_RIGID;
    public static final ForgeConfigSpec.BooleanValue CONVERT_GEO;
@@ -79,6 +80,9 @@ public final class FixConfig {
       FORCE_RIGID = b.comment("Namespaces (\"alexsmobs\") or entity ids (\"naturalist:bear\") that always use the rigid path.",
             "A GeckoLib/AzureLib mob that converts fine ignores this.")
          .defineListAllowEmpty("forceRigid", List.of("alexsmobs", "naturalist"), o -> o instanceof String);
+      NO_RAGDOLL = b.comment("Namespaces or entity ids that never turn into a ragdoll, the dead mob stays as it is.",
+            "Ice and Fire dragons are on this list because their bodies have to stay lootable. Empty the list to ragdoll them too.")
+         .defineListAllowEmpty("noRagdoll", List.of("iceandfire:fire_dragon", "iceandfire:ice_dragon", "iceandfire:lightning_dragon"), o -> o instanceof String);
       OWN_RENDER_DUMMY = b.comment("Draw each ragdoll from its own copy of the mob (variant, colour, profession, facing).",
             "false = the original's shared default copy. copyDamageState needs this.")
          .define("perRagdollModel", true);
@@ -129,12 +133,20 @@ public final class FixConfig {
    }
 
    public static boolean isForcedRigid(EntityType<?> type) {
+      return listed(FORCE_RIGID.get(), type);
+   }
+
+   public static boolean isNoRagdoll(EntityType<?> type) {
+      return listed(NO_RAGDOLL.get(), type);
+   }
+
+   private static boolean listed(List<? extends String> list, EntityType<?> type) {
       ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(type);
       if (key == null) {
          return false;
       }
 
-      for (String entry : FORCE_RIGID.get()) {
+      for (String entry : list) {
          String e = entry.trim();
          if (e.equalsIgnoreCase(key.getNamespace()) || e.equalsIgnoreCase(key.toString())) {
             return true;

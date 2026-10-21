@@ -95,6 +95,13 @@ public abstract class ClientRagdollManagerMixin {
       this.saros_fix$baby = baby;
       this.saros_fix$type = type;
       this.saros_fix$sizeBefore = this.ragdolls.size();
+
+      // no ragdoll: nothing gets hidden either, so the body stays in the world to be looted
+      if (FixConfig.isNoRagdoll(type)) {
+         ci.cancel();
+         return;
+      }
+
       this.saros_fix$x = x;
       this.saros_fix$y = y;
       this.saros_fix$z = z;
