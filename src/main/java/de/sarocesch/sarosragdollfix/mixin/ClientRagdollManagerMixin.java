@@ -17,6 +17,7 @@ import de.sarocesch.sarosragdollfix.SarosRagdollFix;
 import de.sarocesch.sarosragdollfix.SizeFix;
 import de.sarocesch.sarosragdollfix.SleepPose;
 import de.sarocesch.sarosragdollfix.SleepTracker;
+import de.sarocesch.sarosragdollfix.WingFix;
 import de.sarocesch.sarosragdollfix.WoundCompat;
 import java.util.List;
 import java.util.Random;
@@ -168,6 +169,7 @@ public abstract class ClientRagdollManagerMixin {
    )
    private MobSkeleton saros_fix$skipGuessedSkeleton(VanillaModelSkeletonProvider provider, EntityType<?> type, ClientLevel level, boolean baby) {
       ModelScaleFix.begin(type, baby);
+      WingFix.begin();
       try {
          if (FixConfig.CONVERT_GEO.get() || FixConfig.CONVERT_CITADEL.get()) {
             // null means it can't be converted, carry on the old way
@@ -180,6 +182,7 @@ public abstract class ClientRagdollManagerMixin {
          return FixConfig.isForcedRigid(type) ? null : provider.build(type, level, baby);
       } finally {
          ModelScaleFix.end();
+         WingFix.end();
       }
    }
 

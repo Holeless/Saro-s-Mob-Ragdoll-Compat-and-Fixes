@@ -29,6 +29,7 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.TropicalFish;
 import net.minecraft.world.entity.monster.ZombieVillager;
 import net.minecraft.world.entity.npc.VillagerData;
 import net.minecraft.world.entity.npc.VillagerDataHolder;
@@ -41,6 +42,10 @@ public final class RigidDummies {
    private static final Map<ClientMobRagdoll, Map<RenderType, RenderType>> LAYER_TYPES = Collections.synchronizedMap(new WeakHashMap<>());
    private static final Map<ClientMobRagdoll, List<RenderType>> EXTRA_TYPES = Collections.synchronizedMap(new WeakHashMap<>());
    private static final Map<ClientMobRagdoll, List<WoundCompat.Wound>> WOUNDS = Collections.synchronizedMap(new WeakHashMap<>());
+
+   // colours that are a tint on a shared texture (sheep wool, tropical fish), see TintProbe
+   private static final Map<ClientMobRagdoll, Map<RenderType, float[]>> LAYER_TINTS = Collections.synchronizedMap(new WeakHashMap<>());
+   private static final Map<ClientMobRagdoll, float[]> BASE_TINTS = Collections.synchronizedMap(new WeakHashMap<>());
 
    // villager skins we painted ourselves, freed with the ragdoll
    private static final Map<ClientMobRagdoll, ResourceLocation> OWN_SKINS = Collections.synchronizedMap(new WeakHashMap<>());
@@ -85,6 +90,16 @@ public final class RigidDummies {
    }
 
    @Nullable
+   public static Map<RenderType, float[]> layerTints(ClientMobRagdoll ragdoll) {
+      return LAYER_TINTS.get(ragdoll);
+   }
+
+   @Nullable
+   public static float[] baseTint(ClientMobRagdoll ragdoll) {
+      return BASE_TINTS.get(ragdoll);
+   }
+
+   @Nullable
    public static List<WoundCompat.Wound> wounds(ClientMobRagdoll ragdoll) {
       return WOUNDS.get(ragdoll);
    }
@@ -95,6 +110,8 @@ public final class RigidDummies {
 
    /** Ragdoll removed, free its wound textures. */
    public static void release(ClientMobRagdoll ragdoll) {
+      LAYER_TINTS.remove(ragdoll);
+      BASE_TINTS.remove(ragdoll);
       List<WoundCompat.Wound> w = WOUNDS.remove(ragdoll);
       WoundCompat.releaseAll(w);
       ResourceLocation skin = OWN_SKINS.remove(ragdoll);
@@ -131,6 +148,10 @@ public final class RigidDummies {
       Entity dummy = prebuilt != null ? prebuilt : DummyFactory.create(type, level, live, baby);
       if (dummy == null) {
          return;
+      }
+
+      if (FixConfig.FIX_TINTS.get()) {
+         captureBaseTint(ragdoll, dummy);
       }
 
       // The base texture goes through a hook we know runs, so a villager's profession is painted into it.
@@ -175,6 +196,16 @@ public final class RigidDummies {
          }
       } catch (Throwable t) {
          SarosRagdollFix.LOG.debug("[ragdoll-fix] could not resolve look for {}", type, t);
+      }
+   }
+
+   // The body colour of a tropical fish is a tint the renderer sets on its model, not a texture.
+   private static void captureBaseTint(ClientMobRagdoll ragdoll, Entity dummy) {
+      if (dummy instanceof TropicalFish fish) {
+         float[] c = fish.getBaseColor().getTextureDiffuseColors();
+         if (c != null && c.length >= 3) {
+            BASE_TINTS.put(ragdoll, new float[]{c[0], c[1], c[2]});
+         }
       }
    }
 
@@ -388,6 +419,7 @@ public final class RigidDummies {
          }
 
          Map<RenderType, RenderType> map = new HashMap<>();
+         Map<RenderType, float[]> tints = new HashMap<>();
          for (Object layer : (List<Object>)layerObjects.invoke(null, skeleton.renderer)) {
             List<RenderType> old = (List<RenderType>)typesUsedBy.invoke(null, layer, skeleton.dummy);
             List<RenderType> now = (List<RenderType>)typesUsedBy.invoke(null, layer, dummy);
@@ -398,6 +430,14 @@ public final class RigidDummies {
                   }
                }
             }
+
+            if (FixConfig.FIX_TINTS.get() && now != null && !now.isEmpty() && !isEquipmentLayer(layer)) {
+               tints.putAll(TintProbe.tintsUsedBy(layer, dummy));
+            }
+         }
+
+         if (!tints.isEmpty()) {
+            LAYER_TINTS.put(ragdoll, tints);
          }
 
          if (!map.isEmpty()) {

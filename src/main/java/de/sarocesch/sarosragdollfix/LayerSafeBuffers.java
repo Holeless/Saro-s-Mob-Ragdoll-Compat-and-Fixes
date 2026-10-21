@@ -1,6 +1,8 @@
 package de.sarocesch.sarosragdollfix;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import java.util.Map;
+import javax.annotation.Nullable;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 
@@ -9,22 +11,38 @@ import net.minecraft.client.renderer.RenderType;
 // wrote into the wrong buffer and vanished.
 // The first consumer handed out here (the base one) asks the real source for its RenderType on every call, which
 // reopens the base batch after a layer, same as vanilla entity renderers do.
+//
+// It also applies the per-ragdoll colours: a tint for the body (tropical fish colour) and a tint per layer RenderType (sheep
+// wool, fish pattern, collars), see TintProbe.
 public final class LayerSafeBuffers implements MultiBufferSource {
    private final MultiBufferSource inner;
+   @Nullable
+   private final float[] baseTint;
+   @Nullable
+   private final Map<RenderType, float[]> layerTints;
    private boolean baseGiven;
 
    public LayerSafeBuffers(MultiBufferSource inner) {
+      this(inner, null, null);
+   }
+
+   public LayerSafeBuffers(MultiBufferSource inner, @Nullable float[] baseTint, @Nullable Map<RenderType, float[]> layerTints) {
       this.inner = inner;
+      this.baseTint = baseTint;
+      this.layerTints = layerTints;
    }
 
    @Override
    public VertexConsumer getBuffer(RenderType type) {
       if (this.baseGiven) {
-         return this.inner.getBuffer(type);
+         float[] c = this.layerTints == null ? null : this.layerTints.get(type);
+         VertexConsumer consumer = this.inner.getBuffer(type);
+         return c == null ? consumer : new TintedConsumer(consumer, c[0], c[1], c[2]);
       }
 
       this.baseGiven = true;
-      return new Base(this.inner, type);
+      VertexConsumer base = new Base(this.inner, type);
+      return this.baseTint == null ? base : new TintedConsumer(base, this.baseTint[0], this.baseTint[1], this.baseTint[2]);
    }
 
    private static final class Base implements VertexConsumer {

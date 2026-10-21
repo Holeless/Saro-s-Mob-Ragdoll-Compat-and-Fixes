@@ -3,6 +3,7 @@ package de.sarocesch.sarosragdollfix.mixin;
 import de.sarocesch.sarosmobragdoll.client.skeleton.VanillaModelSkeletonProvider;
 import de.sarocesch.sarosragdollfix.GeoSkeletons;
 import de.sarocesch.sarosragdollfix.ModelScaleFix;
+import de.sarocesch.sarosragdollfix.WingFix;
 import java.util.List;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -11,7 +12,10 @@ import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = VanillaModelSkeletonProvider.class, remap = false)
 public abstract class VanillaModelSkeletonProviderMixin {
@@ -49,6 +53,22 @@ public abstract class VanillaModelSkeletonProviderMixin {
          this.dfs(part, name, parent, ModelScaleFix.adjust(prefix), ModelScaleFix.adjust(scale), depth, out);
       } else {
          this.dfs(part, name, parent, prefix, scale, depth, out);
+      }
+   }
+
+   // remembers which parts have a drawn bone above them, see WingFix
+   @Inject(method = "dfs", at = @At("HEAD"))
+   private void saros_fix$trackBoneCover(
+      ModelPart part, String name, ModelPart parent, Matrix4f prefix, float scale, int depth, List<?> out, CallbackInfo ci
+   ) {
+      WingFix.enter(part, parent);
+   }
+
+   // a thin part (bee wing) whose parent isn't drawn by any bone becomes a bone itself, otherwise nothing draws it
+   @Inject(method = "isDecoration", at = @At("HEAD"), cancellable = true)
+   private static void saros_fix$orphanWings(ModelPart part, ModelPart parent, CallbackInfoReturnable<Boolean> cir) {
+      if (WingFix.isOrphan(part, parent)) {
+         cir.setReturnValue(Boolean.FALSE);
       }
    }
 }

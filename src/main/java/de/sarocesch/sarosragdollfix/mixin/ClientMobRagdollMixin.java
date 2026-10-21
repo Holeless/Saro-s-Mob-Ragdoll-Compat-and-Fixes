@@ -9,8 +9,10 @@ import de.sarocesch.sarosmobragdoll.client.skeleton.SkeletonLayer;
 import de.sarocesch.sarosragdollfix.LayerSafeBuffers;
 import de.sarocesch.sarosragdollfix.RigidDummies;
 import de.sarocesch.sarosragdollfix.TintedConsumer;
+import de.sarocesch.sarosragdollfix.WingFix;
 import de.sarocesch.sarosragdollfix.WoundCompat;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -38,15 +40,33 @@ public abstract class ClientMobRagdollMixin {
       throw new AssertionError();
    }
 
-   // bones after the first vanished whenever a layer was drawn, see LayerSafeBuffers
+   // bones after the first vanished whenever a layer was drawn, see LayerSafeBuffers. It also carries this mob's colours
+   // (wool, fish body and pattern).
    @ModifyVariable(method = "render", at = @At("HEAD"), argsOnly = true)
    private MultiBufferSource saros_fix$layerSafeBuffers(MultiBufferSource buffers) {
       MobSkeleton s = this.skeleton;
-      if (s == null || s.rigid || s.layers == null || s.layers.isEmpty()) {
+      if (s == null || s.rigid) {
          return buffers;
       }
 
-      return new LayerSafeBuffers(buffers);
+      ClientMobRagdoll self = (ClientMobRagdoll)(Object)this;
+      float[] baseTint = RigidDummies.baseTint(self);
+      Map<RenderType, float[]> layerTints = RigidDummies.layerTints(self);
+      boolean hasLayers = s.layers != null && !s.layers.isEmpty();
+      if (!hasLayers && baseTint == null) {
+         return buffers;
+      }
+
+      return new LayerSafeBuffers(buffers, baseTint, layerTints);
+   }
+
+   // Decorations that aren't bones are drawn in whatever pose the shared model was last left in, which is the flap of the
+   // last living bat or bee. Put them at rest before drawing, see WingFix.
+   @Inject(method = "renderPartCubesOnly", at = @At("HEAD"))
+   private static void saros_fix$restingDecorations(
+      ModelPart part, PoseStack pose, VertexConsumer consumer, int light, float alpha, Set<ModelPart> boneParts, CallbackInfo ci
+   ) {
+      WingFix.restPose(part, boneParts);
    }
 
    // rigid ragdolls: draw from their own copy of the mob

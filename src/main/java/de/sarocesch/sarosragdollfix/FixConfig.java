@@ -37,6 +37,9 @@ public final class FixConfig {
    public static final ForgeConfigSpec.BooleanValue FIX_MODEL_SCALE;
    public static final ForgeConfigSpec.BooleanValue FIX_ENTITY_SIZE;
    public static final ForgeConfigSpec.BooleanValue DEDUPE_SPAWNS;
+   public static final ForgeConfigSpec.BooleanValue FIX_TINTS;
+   public static final ForgeConfigSpec.BooleanValue FIX_WINGS;
+   public static final ForgeConfigSpec.BooleanValue WAKE_ON_TERRAIN_CHANGE;
 
    public static final ForgeConfigSpec.BooleanValue LAY_SLEEPERS;
    public static final ForgeConfigSpec.BooleanValue SLEEP_FACE_DOWN;
@@ -103,6 +106,13 @@ public final class FixConfig {
       DEDUPE_SPAWNS = b.comment("Ignore a second spawn for the same mob (same id, or same type on the same spot in the same tick).",
             "Some GeckoLib/AzureLib mobs showed up twice. Ignored spawns are logged as [ragdoll-fix].")
          .define("dedupeSpawns", true);
+      FIX_TINTS = b.comment("Keep colours that are a tint on a shared texture: sheep wool, tropical fish body and pattern, wolf collars.",
+            "The original drew every sheep white and every tropical fish grey.")
+         .define("fixTints", true);
+      FIX_WINGS = b.comment("Wings: draw thin parts that were never drawn (bee wings), and stop wings flapping on a dead mob.")
+         .define("fixWings", true);
+      WAKE_ON_TERRAIN_CHANGE = b.comment("Wake settled ragdolls when blocks around them change, so a body falls when the block under it is broken.")
+         .define("wakeOnBlockChange", true);
       b.pop();
 
       b.comment("Mobs that die in a bed").push("sleeping");
