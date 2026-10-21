@@ -38,8 +38,7 @@ public abstract class ClientMobRagdollMixin {
       throw new AssertionError();
    }
 
-   // The original keeps one base VertexConsumer for the whole bone loop, and drawing a bone's layers (glowing eyes...)
-   // ends that batch, so every bone after the first vanished. See LayerSafeBuffers.
+   // bones after the first vanished whenever a layer was drawn, see LayerSafeBuffers
    @ModifyVariable(method = "render", at = @At("HEAD"), argsOnly = true)
    private MultiBufferSource saros_fix$layerSafeBuffers(MultiBufferSource buffers) {
       MobSkeleton s = this.skeleton;

@@ -21,7 +21,7 @@ public abstract class VanillaModelSkeletonProviderMixin {
    @Shadow
    protected abstract void dfs(ModelPart part, String name, ModelPart parent, Matrix4f prefix, float scale, int depth, List<?> out);
 
-   // while a GeckoLib/Citadel mob is being converted, hand the builder the converted model
+   // while a GeckoLib/AzureLib/Citadel mob is being converted, hand the builder the converted model
    @Redirect(
       method = BUILD,
       at = @At(

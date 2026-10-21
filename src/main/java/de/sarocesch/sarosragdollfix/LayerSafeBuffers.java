@@ -4,15 +4,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 
-// Saro's ClientMobRagdoll.render() asks for the base VertexConsumer once, before the bone loop, and keeps using it for
-// every bone. But after each bone it draws that bone's overlay layers (glowing eyes, ...), and asking the buffer source
-// for a different RenderType ends the base batch, which hands the same shared BufferBuilder to the layer's batch.
-// Every bone after the first one then writes its body cubes into the layer batch (or into a finished one), so only the
-// first bone (the torso) and the layers ever show up.
-//
-// This wraps the buffer source for one render() call. The first consumer it gives out (the base one) is a proxy that asks
-// the real source for its RenderType again on every call, so the base batch is simply reopened after each layer, the
-// same as vanilla does when an entity renderer alternates between its model and its layers.
+// Saro's render() gets the base VertexConsumer once and reuses it for every bone, but it draws each bone's layers
+// (glowing eyes etc.) in between. Asking for a layer's RenderType ends the base batch, so every bone after the first
+// wrote into the wrong buffer and vanished.
+// The first consumer handed out here (the base one) asks the real source for its RenderType on every call, which
+// reopens the base batch after a layer, same as vanilla entity renderers do.
 public final class LayerSafeBuffers implements MultiBufferSource {
    private final MultiBufferSource inner;
    private boolean baseGiven;
@@ -95,7 +91,7 @@ public final class LayerSafeBuffers implements MultiBufferSource {
          this.current().unsetDefaultColor();
       }
 
-      // ModelPart cubes write through this one. Forward it whole so the builder keeps its fast path.
+      // ModelPart cubes write through this overload
       @Override
       public void vertex(
          float x, float y, float z, float red, float green, float blue, float alpha, float u, float v, int overlay, int light, float nx, float ny, float nz

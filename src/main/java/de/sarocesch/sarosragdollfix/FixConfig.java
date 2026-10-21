@@ -68,21 +68,21 @@ public final class FixConfig {
       b.comment("Mobs whose model isn't a vanilla ModelPart tree (Alex's Mobs, Naturalist...). The original falls back to one",
             "rigid box for these.")
          .push("compat");
-      CONVERT_GEO = b.comment("GeckoLib mobs: build a limb skeleton from the .geo.json so they flop like vanilla mobs.",
+      CONVERT_GEO = b.comment("GeckoLib and AzureLib mobs: build a limb skeleton from the .geo.json so they flop like vanilla mobs.",
             "Falls back to the rigid box if the model can't be converted.")
          .define("convertGeoModels", true);
       CONVERT_CITADEL = b.comment("Same for Citadel mobs (Alex's Mobs)").define("convertCitadelModels", true);
-      GEO_HIDDEN_BONES = b.comment("Bones (lower case) that GeckoLib mobs only show in some states. They're left out of the",
+      GEO_HIDDEN_BONES = b.comment("Bones (lower case) that GeckoLib/AzureLib mobs only show in some states. They're left out of the",
             "converted skeleton. baby_* bones are only used for babies.")
          .defineListAllowEmpty("geoHiddenBones", List.of("sleep", "sleeping", "angry", "head_angry", "snout_angry"), o -> o instanceof String);
       FORCE_RIGID = b.comment("Namespaces (\"alexsmobs\") or entity ids (\"naturalist:bear\") that always use the rigid path.",
-            "A GeckoLib mob that converts fine ignores this.")
+            "A GeckoLib/AzureLib mob that converts fine ignores this.")
          .defineListAllowEmpty("forceRigid", List.of("alexsmobs", "naturalist"), o -> o instanceof String);
       OWN_RENDER_DUMMY = b.comment("Draw each ragdoll from its own copy of the mob (variant, colour, profession, facing).",
             "false = the original's shared default copy. copyDamageState needs this.")
          .define("perRagdollModel", true);
       REMOVE_ORIGINAL_FOR_RIGID = b.comment("Remove the dying mob from the client world when a rigid or converted ragdoll takes over.",
-            "GeckoLib/Citadel renderers don't always respect the original's hide trick.")
+            "GeckoLib/AzureLib/Citadel renderers don't always respect the original's hide trick.")
          .define("removeOriginal", true);
       b.pop();
 
@@ -93,7 +93,7 @@ public final class FixConfig {
       FIX_MODEL_SCALE = b.comment("Fix models that scale themselves when drawn (adult rabbits were 1.67x too big)")
          .define("fixModelScale", true);
       DEDUPE_SPAWNS = b.comment("Ignore a second spawn for the same mob (same id, or same type on the same spot in the same tick).",
-            "Some GeckoLib mobs showed up twice. Ignored spawns are logged as [ragdoll-fix].")
+            "Some GeckoLib/AzureLib mobs showed up twice. Ignored spawns are logged as [ragdoll-fix].")
          .define("dedupeSpawns", true);
       b.pop();
 

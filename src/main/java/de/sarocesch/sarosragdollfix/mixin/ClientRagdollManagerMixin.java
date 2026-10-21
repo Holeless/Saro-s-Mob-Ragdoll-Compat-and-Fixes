@@ -202,7 +202,7 @@ public abstract class ClientRagdollManagerMixin {
             RigidDummies.captureLook(rag, skeleton, type, level, live, copy, baby);
          }
 
-         // converted GeckoLib mobs ignore the original mod's hide trick, so remove the original
+         // converted GeckoLib/AzureLib mobs ignore the original mod's hide trick, so remove the original
          if (GeoSkeletons.isConverted(skeleton) && FixConfig.REMOVE_ORIGINAL_FOR_RIGID.get()) {
             RagdollCleanup.discard(level, entityId, live);
          }

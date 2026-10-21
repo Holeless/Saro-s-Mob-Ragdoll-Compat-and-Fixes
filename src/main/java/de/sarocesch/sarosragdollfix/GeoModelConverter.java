@@ -25,7 +25,7 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 
-// Bedrock / GeckoLib .geo.json -> vanilla ModelPart tree.
+// Bedrock / GeckoLib / AzureLib .geo.json -> vanilla ModelPart tree.
 // Same pixel units and box UV layout, front is -Z in both. Only Y differs: Bedrock is Y up with the feet at 0, vanilla is
 // Y down with the feet at 24. So (x, y, z) -> (x, 24 - y, z), and (dx, -dy, dz) relative to a parent pivot. Rotations
 // keep the same ZYX order and carry over as they are (same as Blockbench's exporter).

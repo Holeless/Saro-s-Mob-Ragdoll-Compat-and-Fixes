@@ -10,7 +10,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 
-// Stops doubled corpses. Some GeckoLib mobs trigger spawn() twice, and get re-added by the server while they play their
+// Stops doubled corpses. Some GeckoLib/AzureLib mobs trigger spawn() twice, and get re-added by the server while they play their
 // death animation, so we ignore repeat spawns and keep checking that the removed original stays removed for a few seconds.
 public final class RagdollCleanup {
    private static final int SPAWN_MEMORY_TICKS = 600;
