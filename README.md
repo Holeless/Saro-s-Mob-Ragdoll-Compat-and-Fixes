@@ -1,4 +1,4 @@
-Saro's Mob Ragdoll Compat and Fixes aims to broaden Saro's Mob Ragdoll's compatibility to mods dependent on Geckolib and Citadel.
+Saro's Mob Ragdoll Compat and Fixes aims to broaden Saro's Mob Ragdoll's compatibility to mods dependent on Geckolib, AzureLib and Citadel.
 
 This mod also changes how mobs are flung; in the original mod, mobs have a hardcoded launch of 6 b/s away from the attacker, +2 up, applied as the same velocity to every body part, making the corpse launch stiff. Mob launch is now dynamic and configurable in config/saros_ragdoll_fix-client.toml.
 
