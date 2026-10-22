@@ -37,6 +37,14 @@ public final class FixConfig {
    public static final ForgeConfigSpec.BooleanValue FIX_MODEL_SCALE;
    public static final ForgeConfigSpec.BooleanValue FIX_ENTITY_SIZE;
    public static final ForgeConfigSpec.BooleanValue DEDUPE_SPAWNS;
+   public static final ForgeConfigSpec.BooleanValue FIX_TINTS;
+   public static final ForgeConfigSpec.BooleanValue FIX_WINGS;
+   public static final ForgeConfigSpec.BooleanValue WAKE_ON_TERRAIN_CHANGE;
+   public static final ForgeConfigSpec.BooleanValue FREEZE_RIGID_ANIMATION;
+
+   public static final ForgeConfigSpec.BooleanValue RAGDOLL_SEGMENTS;
+   public static final ForgeConfigSpec.ConfigValue<List<? extends String>> SEGMENT_TYPES;
+   public static final ForgeConfigSpec.DoubleValue SEGMENT_RADIUS;
 
    public static final ForgeConfigSpec.BooleanValue LAY_SLEEPERS;
    public static final ForgeConfigSpec.BooleanValue SLEEP_FACE_DOWN;
@@ -103,6 +111,27 @@ public final class FixConfig {
       DEDUPE_SPAWNS = b.comment("Ignore a second spawn for the same mob (same id, or same type on the same spot in the same tick).",
             "Some GeckoLib/AzureLib mobs showed up twice. Ignored spawns are logged as [ragdoll-fix].")
          .define("dedupeSpawns", true);
+      FIX_TINTS = b.comment("Keep colours that are a tint on a shared texture: sheep wool, tropical fish body and pattern, wolf collars.",
+            "The original drew every sheep white and every tropical fish grey.")
+         .define("fixTints", true);
+      FIX_WINGS = b.comment("Wings: draw thin parts that were never drawn (bee wings), and stop wings flapping on a dead mob.")
+         .define("fixWings", true);
+      WAKE_ON_TERRAIN_CHANGE = b.comment("Wake settled ragdolls when blocks around them change, so a body falls when the block under it is broken.")
+         .define("wakeOnBlockChange", true);
+      FREEZE_RIGID_ANIMATION = b.comment("Mobs drawn by their own renderer (the rigid path: GeckoLib, AzureLib, Citadel) keep playing their animation",
+            "on a dead body because the animation clock is the render partial tick. true = freeze them at the start of the animation.")
+         .define("freezeRigidAnimation", true);
+      b.pop();
+
+      b.comment("Mobs made of several entities (Alex's Mobs bone serpent). The head dies and the original only ragdolls the head,",
+            "the body segments just vanish.").push("segments");
+      RAGDOLL_SEGMENTS = b.comment("When a mob dies, also ragdoll its segment entities (each as its own ragdoll, they are not joined together).")
+         .define("enabled", true);
+      SEGMENT_TYPES = b.comment("Entity ids of segment entities. Only these are collected. A segment that can tell which mob it belongs to",
+            "is only taken by that mob, otherwise any listed segment close to the dying mob is.")
+         .defineListAllowEmpty("types", List.of("alexsmobs:bone_serpent_part", "alexsmobs:anaconda_part"), o -> o instanceof String);
+      SEGMENT_RADIUS = b.comment("How far from the dying mob to look for its segments, in blocks")
+         .defineInRange("searchRadius", 24.0, 2.0, 128.0);
       b.pop();
 
       b.comment("Mobs that die in a bed").push("sleeping");
@@ -134,6 +163,21 @@ public final class FixConfig {
 
    public static boolean isForcedRigid(EntityType<?> type) {
       return listed(FORCE_RIGID.get(), type);
+   }
+
+   public static boolean isSegmentType(EntityType<?> type) {
+      ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(type);
+      if (key == null) {
+         return false;
+      }
+
+      for (String entry : SEGMENT_TYPES.get()) {
+         if (entry.trim().equalsIgnoreCase(key.toString())) {
+            return true;
+         }
+      }
+
+      return false;
    }
 
    public static boolean isNoRagdoll(EntityType<?> type) {

@@ -6,9 +6,11 @@
   "refmap": "saros_ragdoll_fix.refmap.json",
   "mixins": [],
   "client": [
+    "BasePhysicsWorldMixin",
     "BoneRagdollPhysicsMixin",
     "ClientMobRagdollAccessor",
     "ClientMobRagdollMixin",
+    "ClientMobRagdollRigidMixin",
     "ClientRagdollManagerMixin",
     "VanillaModelSkeletonProviderMixin"
   ],
