@@ -10,6 +10,7 @@ import de.sarocesch.sarosragdollfix.DummyFactory;
 import de.sarocesch.sarosragdollfix.FixConfig;
 import de.sarocesch.sarosragdollfix.GeoSkeletons;
 import de.sarocesch.sarosragdollfix.ModelScaleFix;
+import de.sarocesch.sarosragdollfix.MultipartCompat;
 import de.sarocesch.sarosragdollfix.RagdollCleanup;
 import de.sarocesch.sarosragdollfix.RagdollLaunch;
 import de.sarocesch.sarosragdollfix.RigidDummies;
@@ -25,6 +26,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -73,6 +75,22 @@ public abstract class ClientRagdollManagerMixin {
    @Unique
    private boolean saros_fix$baby;
 
+   // segment entities of the dying mob (bone serpent body), found while they are still in the world
+   @Unique
+   private List<MultipartCompat.Segment> saros_fix$segments;
+
+   @Unique
+   private float saros_fix$vx;
+
+   @Unique
+   private float saros_fix$vy;
+
+   @Unique
+   private float saros_fix$vz;
+
+   @Unique
+   private int saros_fix$life;
+
    @Unique
    private double saros_fix$x;
 
@@ -93,6 +111,11 @@ public abstract class ClientRagdollManagerMixin {
       this.saros_fix$sleep = null;
       this.saros_fix$look = null;
       this.saros_fix$live = null;
+      this.saros_fix$segments = null;
+      this.saros_fix$vx = vx;
+      this.saros_fix$vy = vy;
+      this.saros_fix$vz = vz;
+      this.saros_fix$life = lifeTicks;
       this.saros_fix$baby = baby;
       this.saros_fix$type = type;
       this.saros_fix$sizeBefore = this.ragdolls.size();
@@ -121,6 +144,7 @@ public abstract class ClientRagdollManagerMixin {
 
       Entity live = entityId >= 0 ? level.getEntity(entityId) : null;
       this.saros_fix$live = live;
+      this.saros_fix$segments = MultipartCompat.collect(live, level);
       if (live != null && FixConfig.OWN_RENDER_DUMMY.get()) {
          this.saros_fix$look = DummyFactory.create(type, level, live, entityId, baby);
       }
@@ -201,6 +225,45 @@ public abstract class ClientRagdollManagerMixin {
    private void saros_fix$spawnTail(
       EntityType<?> type, int entityId, double x, double y, double z, float bodyYaw, float vx, float vy, float vz, boolean baby, int lifeTicks, CallbackInfo ci
    ) {
+      List<MultipartCompat.Segment> segments = this.saros_fix$segments;
+      this.saros_fix$segments = null;
+      float svx = this.saros_fix$vx;
+      float svy = this.saros_fix$vy;
+      float svz = this.saros_fix$vz;
+      int slife = this.saros_fix$life;
+      boolean spawned = this.ragdolls.size() > this.saros_fix$sizeBefore;
+
+      this.saros_fix$finishSpawn(type, entityId, baby);
+
+      // Has to come last: spawning a segment goes through spawn() again and overwrites this mixin's per-spawn fields.
+      if (spawned && segments != null && !segments.isEmpty()) {
+         this.saros_fix$spawnSegments(segments, svx, svy, svz, slife);
+      }
+   }
+
+   @Unique
+   private void saros_fix$spawnSegments(List<MultipartCompat.Segment> segments, float vx, float vy, float vz, int lifeTicks) {
+      ClientLevel level = Minecraft.getInstance().level;
+      if (level == null) {
+         return;
+      }
+
+      for (MultipartCompat.Segment seg : segments) {
+         Entity e = seg.entity;
+         try {
+            float yaw = e instanceof LivingEntity le ? le.yBodyRot : e.getYRot();
+            ((ClientRagdollManager)(Object)this).spawn(e.getType(), e.getId(), e.getX(), e.getY(), e.getZ(), yaw, vx, vy, vz, false, lifeTicks);
+         } catch (Throwable t) {
+            SarosRagdollFix.LOG.warn("[ragdoll-fix] could not ragdoll segment {}", e.getType(), t);
+         }
+
+         // the segment goes with its parent, don't leave it standing in the world
+         RagdollCleanup.discard(level, e.getId(), e);
+      }
+   }
+
+   @Unique
+   private void saros_fix$finishSpawn(EntityType<?> type, int entityId, boolean baby) {
       List<WoundCompat.Wound> wounds = this.saros_fix$wounds;
       this.saros_fix$wounds = null;
       this.saros_fix$sleep = null;

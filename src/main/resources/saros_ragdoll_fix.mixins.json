@@ -10,6 +10,7 @@
     "BoneRagdollPhysicsMixin",
     "ClientMobRagdollAccessor",
     "ClientMobRagdollMixin",
+    "ClientMobRagdollRigidMixin",
     "ClientRagdollManagerMixin",
     "VanillaModelSkeletonProviderMixin"
   ],
